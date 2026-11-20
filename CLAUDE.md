@@ -10,7 +10,7 @@ App web (PWA) para que negocios de repostería y emprendimientos lleven el contr
 
 ## Estado actual
 
-- **React 19 + TypeScript + Vite** (rama `react`). `legacy/index.html` es la versión anterior de un solo archivo; queda como referencia hasta borrarla.
+- **React 19 + TypeScript + Vite.** La versión anterior de un solo archivo se puede consultar en el historial de git (commit `d0ff071`).
 - Estructura:
   - `src/logica/`: funciones puras del dominio (saldo, moneda, teléfonos, países, métodos de pago, mensajes de WhatsApp, venta, BCV). Sin DOM ni `localStorage`; todo lo que necesitan entra por parámetro.
   - `src/datos/`: `localStorage` (claves, carga, migraciones y saneamiento) y respaldos JSON/CSV. Reciben el almacenamiento por parámetro para poder probarse.
