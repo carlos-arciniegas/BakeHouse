@@ -1,7 +1,9 @@
 import type { Session } from '@supabase/supabase-js'
 import { useCallback, useEffect, useState } from 'react'
 import { guardarVinculo, leerVinculo, mensajeDeError, type ErrorAuth } from '../datos/cuenta'
+import type { EstadoGuardado } from '../datos/almacenamiento'
 import type { FilaNegocio } from '../datos/nube'
+import { guardarSubida, leerSubida, subirDatos, type Destino, type ResumenSubida } from '../datos/subida'
 import { supabase } from '../datos/supabase'
 import type { Negocio } from '../logica/tipos'
 
@@ -33,6 +35,7 @@ export function useCuentaNube() {
   const [negocios, setNegocios] = useState<FilaNegocio[] | null>(null)
   const [vinculo, setVinculo] = useState(() => leerVinculo(localStorage))
   const [error, setError] = useState<string | null>(null)
+  const [subida, setSubida] = useState(() => leerSubida(localStorage))
 
   // Al cambiar de cuenta (o cerrar sesión) se olvida la lista anterior
   const [usuarioAntes, setUsuarioAntes] = useState(usuarioId)
@@ -85,6 +88,34 @@ export function useCuentaNube() {
     return { ok: true }
   }
 
+  /** Sube todo lo del dispositivo al negocio conectado; se puede repetir sin duplicar */
+  const subirMisDatos = async (
+    estado: EstadoGuardado,
+    alAvanzar: (enviadas: number, total: number) => void,
+  ): Promise<{ ok: true; resumen: ResumenSubida } | { ok: false; mensaje: string }> => {
+    if (!supabase || !vinculo) return { ok: false, mensaje: 'Primero conecta este dispositivo a un negocio.' }
+    const nube = supabase
+    const negocioId = vinculo
+    const destino: Destino = {
+      guardar: async (tabla, filas) => {
+        const { error: e, status } = await nube.from(tabla).upsert(filas as never, { onConflict: 'negocio_id,id' })
+        return e ? { status, code: e.code } : null
+      },
+      actualizarNegocio: async (fila) => {
+        const { error: e, status } = await nube.from('negocios').update(fila).eq('id', negocioId)
+        return e ? { status, code: e.code } : null
+      },
+    }
+    const r = await subirDatos(destino, estado, negocioId, alAvanzar)
+    if (!r.ok) {
+      const mensaje = mensajeDeError(r.error)
+      return { ok: false, mensaje: r.enviadas > 0 ? mensaje + ' Lo que ya se subió no se duplica al reintentar.' : mensaje }
+    }
+    guardarSubida(localStorage, r.resumen)
+    setSubida(r.resumen)
+    return r
+  }
+
   const cerrarSesion = async () => {
     conectar(null)
     await supabase?.auth.signOut()
@@ -98,9 +129,12 @@ export function useCuentaNube() {
     correo: sesion?.user.email ?? null,
     negocios: negocios ?? [],
     conectado,
+    // Solo la del negocio conectado
+    ultimaSubida: subida && subida.negocioId === vinculo ? subida : null,
     error,
     enviarEnlace,
     crearEnNube,
+    subirMisDatos,
     conectar,
     cerrarSesion,
   }

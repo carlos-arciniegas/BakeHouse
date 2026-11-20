@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { datosAFilas, filaANegocio, filasADatos, negocioAFila, type DatosDeNegocio, type FilasRecibidas } from './nube'
+import { datosAFilas, dividirEnLotes, filaANegocio, filasADatos, negocioAFila, type DatosDeNegocio, type FilasRecibidas } from './nube'
 
 const NEGOCIO = '11111111-1111-1111-1111-111111111111'
 
@@ -66,6 +66,52 @@ describe('datos ↔ filas de Supabase', () => {
     const resultado = filasADatos(filas)
     expect(resultado.clientes[0].movimientos[0].monto).toBe(3)
     expect(resultado.catalogo[0].precio).toBe(2.5)
+  })
+})
+
+describe('datosAFilas respeta los límites de la base', () => {
+  const raro: DatosDeNegocio = {
+    clientes: [{
+      id: 'cli_1', nombre: '   ', telefono: '+58 (414) 987-6543', nota: 'x'.repeat(250),
+      movimientos: [
+        { id: 'mov_1', tipo: 'venta', descripcion: 'Torta 🎂'.repeat(100), monto: 10.005, fecha: '' },
+        { id: 'mov_2', tipo: 'abono', descripcion: '', monto: 0.001, fecha: '2026-11-20' },
+      ],
+    }],
+    catalogo: [{ id: 'prod_1', nombre: 'Galleta', precio: 0.004 }, { id: 'p'.repeat(65), nombre: 'Id largo', precio: 2 }],
+    metodos: [],
+  }
+  const filas = datosAFilas(raro, NEGOCIO, Date.UTC(2026, 10, 20, 12))
+
+  it('recorta textos, deja el teléfono en dígitos y pone nombre si falta', () => {
+    expect(filas.clientes[0]).toMatchObject({ nombre: 'Sin nombre', telefono: '584149876543' })
+    expect(filas.clientes[0].nota).toHaveLength(200)
+    // Recorta por caracteres: 500 como máximo y sin partir el emoji
+    const descripcion = Array.from(filas.movimientos[0].descripcion!)
+    expect(descripcion.length).toBeLessThanOrEqual(500)
+    expect(descripcion.at(-1)).not.toMatch(/[\uD800-\uDFFF]/)
+  })
+
+  it('redondea a céntimos y usa la fecha de la subida si falta', () => {
+    expect(filas.movimientos[0]).toMatchObject({ monto: 10.01, fecha: '2026-11-20' })
+  })
+
+  it('omite solo lo que la base no puede guardar', () => {
+    expect(filas.movimientos.map((m) => m.id)).toEqual(['mov_1'])
+    expect(filas.productos).toEqual([])
+  })
+
+  it('clientes y movimientos llevan creado_en creciente', () => {
+    const fechas = [...filas.clientes, ...filas.movimientos].map((f) => f.creado_en!)
+    expect([...fechas].sort()).toEqual(fechas)
+    expect(new Set(fechas).size).toBe(fechas.length)
+  })
+})
+
+describe('dividirEnLotes', () => {
+  it('parte en lotes del tamaño pedido', () => {
+    expect(dividirEnLotes([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]])
+    expect(dividirEnLotes([], 2)).toEqual([])
   })
 })
 

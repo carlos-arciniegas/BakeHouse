@@ -52,9 +52,13 @@ Proyecto `kvvzdbycnabpkkszcpge`, región **eu-west-1 (Irlanda)**. Desde Venezuel
 - Primer uso: crear el negocio con `crear_negocio()`, o entrar al que ya existe.
 - Sin sesión la app sigue funcionando como hoy, solo en el dispositivo. La nube es opcional: nadie pierde lo que ya tiene.
 
-### Fase 4: subir los datos existentes
-- "Subir mis datos a la nube": envía clientes, movimientos, catálogo y métodos de pago con sus ids actuales (`upsert`, se puede repetir sin duplicar).
+### Fase 4: subir los datos existentes (hecho, oculto en producción)
+- "Subir mis datos": envía clientes, movimientos, catálogo y métodos de pago con sus ids actuales (`upsert` por `negocio_id, id`, se puede repetir sin duplicar), en lotes de 500 y con el avance en el botón. También actualiza nombre, país y tasa del negocio.
 - Antes de subir se descarga una copia de seguridad automáticamente.
+- `datosAFilas` ajusta los datos viejos a los límites de la base (recorta textos, redondea a céntimos, fecha faltante = día de la subida) para que una fila rara no haga fallar todo.
+- Si se corta la red a mitad, se detiene y avisa; al reintentar, lo ya subido se sobrescribe.
+- Lógica en `src/datos/subida.ts` (la red entra por parámetro); la subida repetida y el intento de otra cuenta están en `supabase/pruebas/seguridad.sql`.
+- Lo que se anota después no se sube solo: eso es la fase 5.
 
 ### Fase 5: sincronización
 - Cada acción del reductor deja un cambio en una **cola local** (`localStorage`). Con red, la cola se envía en orden; si falla, se reintenta.

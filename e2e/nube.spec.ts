@@ -11,16 +11,22 @@ const CLAVE_SESION = 'sb-kvvzdbycnabpkkszcpge-auth-token'
 interface Simulacion {
   negocios?: typeof NEGOCIO_NUBE[]
   limiteDeCorreos?: boolean
+  /** Corta la red al subir a esta tabla (mientras sea true) */
+  sinRedEn?: { tabla: string; activo: boolean }
 }
+
+const TABLAS_DE_DATOS = ['clientes', 'movimientos', 'productos', 'metodos_pago']
 
 /** Responde como Supabase y anota cada llamada; una llamada no prevista hace fallar la prueba */
 async function simularSupabase(page: Page, opciones: Simulacion = {}) {
-  const llamadas: { metodo: string; ruta: string; cuerpo: unknown; url: string }[] = []
+  const llamadas: { metodo: string; ruta: string; cuerpo: unknown; url: string; cabeceras: Record<string, string> }[] = []
   await page.route(/\.supabase\.co\//, async (ruta) => {
     const peticion = ruta.request()
     const url = new URL(peticion.url())
     const cuerpo = peticion.postData() ? JSON.parse(peticion.postData()!) : null
-    llamadas.push({ metodo: peticion.method(), ruta: url.pathname, cuerpo, url: peticion.url() })
+    const tabla = url.pathname.replace('/rest/v1/', '')
+    if (opciones.sinRedEn?.activo && opciones.sinRedEn.tabla === tabla) return ruta.abort('internetdisconnected')
+    llamadas.push({ metodo: peticion.method(), ruta: url.pathname, cuerpo, url: peticion.url(), cabeceras: peticion.headers() })
 
     if (url.pathname === '/auth/v1/otp') {
       return opciones.limiteDeCorreos
@@ -29,7 +35,10 @@ async function simularSupabase(page: Page, opciones: Simulacion = {}) {
     }
     if (url.pathname === '/auth/v1/logout') return ruta.fulfill({ status: 204 })
     if (url.pathname === '/auth/v1/user') return ruta.fulfill({ json: { ...USUARIO, aud: 'authenticated', role: 'authenticated' } })
-    if (url.pathname === '/rest/v1/negocios') return ruta.fulfill({ json: opciones.negocios ?? [] })
+    if (url.pathname === '/rest/v1/negocios') {
+      return peticion.method() === 'PATCH' ? ruta.fulfill({ status: 204 }) : ruta.fulfill({ json: opciones.negocios ?? [] })
+    }
+    if (peticion.method() === 'POST' && TABLAS_DE_DATOS.includes(tabla)) return ruta.fulfill({ status: 201 })
     if (url.pathname === '/rest/v1/rpc/crear_negocio') return ruta.fulfill({ json: NEGOCIO_NUBE.id })
     return ruta.fulfill({ status: 500, json: { message: 'Llamada no prevista en la prueba: ' + url.pathname } })
   })
@@ -127,4 +136,45 @@ test('cerrar sesión deja los datos del dispositivo intactos', async ({ page }) 
   expect((await guardado<{ clientes: unknown[] }>(page, 'pachons_bakehouse_data_v3')).clientes).toHaveLength(3)
   await page.getByRole('navigation', { name: 'Secciones' }).getByRole('button', { name: 'Cuentas' }).click()
   await expect(fila(page, 'José Rodríguez')).toBeVisible()
+})
+
+test('sube los datos del dispositivo, con una copia descargada antes', async ({ page }) => {
+  const llamadas = await simularSupabase(page, { negocios: [NEGOCIO_NUBE] })
+  await abrirAjustes(page, { conSesion: true })
+
+  const copia = page.waitForEvent('download')
+  await seccion(page).getByRole('button', { name: 'Subir mis datos' }).click()
+  expect((await copia).suggestedFilename()).toMatch(/\.json$/)
+  await expect(page.locator('.toast').last()).toHaveText('Datos subidos: 3 clientes y 7 movimientos')
+
+  // El negocio se actualiza y cada tabla se sube como upsert (repetir no duplica)
+  expect(llamadas.find((l) => l.metodo === 'PATCH')!.cuerpo).toMatchObject({ nombre: "Pachon's Bakehouse", pais: 'VE', tasa_bcv: 100 })
+  const subidas = llamadas.filter((l) => l.metodo === 'POST' && l.ruta !== '/rest/v1/rpc/crear_negocio')
+  expect(subidas.map((l) => l.ruta)).toEqual(['/rest/v1/clientes', '/rest/v1/movimientos', '/rest/v1/productos', '/rest/v1/metodos_pago'])
+  for (const l of subidas) {
+    expect(new URL(l.url).searchParams.get('on_conflict')).toBe('negocio_id,id')
+    expect(l.cabeceras['prefer']).toContain('resolution=merge-duplicates')
+  }
+  const clientes = subidas[0].cuerpo as { id: string; negocio_id: string }[]
+  expect(clientes.map((c) => c.id)).toEqual(['c1', 'c2', 'c3'])
+  expect(clientes.every((c) => c.negocio_id === NEGOCIO_NUBE.id)).toBe(true)
+
+  // Queda el resumen y el botón invita a repetir
+  await expect(seccion(page)).toContainText('Última subida')
+  await expect(seccion(page).getByRole('button', { name: 'Volver a subir mis datos' })).toBeEnabled()
+})
+
+test('si se corta la red a mitad de la subida lo explica y se puede reintentar', async ({ page }) => {
+  const sinRedEn = { tabla: 'movimientos', activo: true }
+  await simularSupabase(page, { negocios: [NEGOCIO_NUBE], sinRedEn })
+  await abrirAjustes(page, { conSesion: true })
+
+  await seccion(page).getByRole('button', { name: 'Subir mis datos' }).click()
+  await expect(page.locator('.toast').last())
+    .toHaveText('No hay conexión. Revisa tu internet y vuelve a intentar. Lo que ya se subió no se duplica al reintentar.')
+  await expect(seccion(page)).not.toContainText('Última subida')
+
+  sinRedEn.activo = false
+  await seccion(page).getByRole('button', { name: 'Subir mis datos' }).click()
+  await expect(page.locator('.toast').last()).toHaveText('Datos subidos: 3 clientes y 7 movimientos')
 })

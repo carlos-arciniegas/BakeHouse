@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { crearRespaldo, nombreArchivoRespaldo } from '../datos/respaldo'
 import { obtenerTasaBCV } from '../logica/bcv'
 import { fechaHoy } from '../logica/fechas'
 import { formatearBolivares } from '../logica/moneda'
@@ -87,5 +88,19 @@ export function useClienteEjemplo() {
     irA('cuentas')
     resaltar(id)
     avisar('Cliente de ejemplo agregado')
+  }
+}
+
+/** Descarga el respaldo .json de todo (botón "Descargar copia" y antes de subir a la nube) */
+export function useDescargarCopia() {
+  const { estado } = useTienda()
+  return () => {
+    const blob = new Blob([JSON.stringify(crearRespaldo(estado), null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = nombreArchivoRespaldo(estado.negocio, fechaHoy())
+    a.click()
+    URL.revokeObjectURL(url)
   }
 }

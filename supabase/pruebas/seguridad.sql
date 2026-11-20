@@ -43,6 +43,18 @@ do $$ begin
   raise notice '✓ actualizado_en lo pone el servidor';
 end $$;
 
+-- "Subir mis datos" usa upsert: repetirlo actualiza y no duplica
+do $$ begin
+  insert into public.clientes (negocio_id, id, nombre, telefono, nota)
+  values (current_setting('pruebas.negocio_ana')::uuid, 'cli_1', 'José Rodríguez', '584149876543', 'Subido otra vez'),
+         (current_setting('pruebas.negocio_ana')::uuid, 'cli_2', 'Andreína', '', '')
+  on conflict (negocio_id, id) do update set nombre = excluded.nombre, telefono = excluded.telefono, nota = excluded.nota;
+  if (select count(*) from public.clientes) <> 2 then raise exception 'FALLA: la subida repetida duplicó clientes'; end if;
+  if (select nota from public.clientes where id = 'cli_1') <> 'Subido otra vez' then raise exception 'FALLA: la subida repetida no actualizó'; end if;
+  delete from public.clientes where id = 'cli_2';
+  raise notice '✓ repetir la subida actualiza sin duplicar';
+end $$;
+
 -- Validaciones
 do $$ begin
   begin
@@ -112,6 +124,12 @@ do $$ begin
   begin
     insert into public.clientes (negocio_id, id, nombre) values (current_setting('pruebas.negocio_ana')::uuid, 'intruso', 'Intruso');
     raise exception 'FALLA: Bruno pudo crear un cliente en el negocio de Ana';
+  exception when insufficient_privilege then null; end;
+
+  begin
+    insert into public.clientes (negocio_id, id, nombre) values (current_setting('pruebas.negocio_ana')::uuid, 'cli_1', 'Hackeado')
+    on conflict (negocio_id, id) do update set nombre = excluded.nombre;
+    raise exception 'FALLA: Bruno pudo subir datos al negocio de Ana';
   exception when insufficient_privilege then null; end;
 
   update public.clientes set nombre = 'Hackeado' where id = 'cli_1';

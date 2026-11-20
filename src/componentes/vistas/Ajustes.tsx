@@ -1,12 +1,12 @@
 import { useState, type ChangeEvent, type FormEvent } from 'react'
-import { crearRespaldo, importarCSV, leerRespaldo, nombreArchivoRespaldo } from '../../datos/respaldo'
+import { importarCSV, leerRespaldo } from '../../datos/respaldo'
 import { fechaHoy } from '../../logica/fechas'
 import { formatearMoneda } from '../../logica/moneda'
 import { esCodigoPais, NOMBRES_MONEDA, PAISES } from '../../logica/paises'
 import type { CodigoPais } from '../../logica/tipos'
 import { useAvisos, useTienda, useUI } from '../../estado/contextos'
 import { Icono } from '../base'
-import { useClienteEjemplo, useSincronizarBCV } from '../ganchos'
+import { useClienteEjemplo, useDescargarCopia, useSincronizarBCV } from '../ganchos'
 import { useInstalarApp } from '../instalar'
 import { CuentaNube } from './CuentaNube'
 
@@ -109,14 +109,9 @@ export function Ajustes() {
   const avisar = useAvisos()
   const agregarEjemplo = useClienteEjemplo()
 
+  const descargar = useDescargarCopia()
   const descargarCopia = () => {
-    const blob = new Blob([JSON.stringify(crearRespaldo(estado), null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = nombreArchivoRespaldo(estado.negocio, fechaHoy())
-    a.click()
-    URL.revokeObjectURL(url)
+    descargar()
     avisar('Copia descargada')
   }
 

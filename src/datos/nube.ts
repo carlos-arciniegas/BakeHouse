@@ -1,3 +1,4 @@
+import { fechaHoy } from '../logica/fechas'
 import { esTipoPago } from '../logica/metodosPago'
 import { esCodigoPais } from '../logica/paises'
 import type { Cliente, ConfigBCV, MetodoPago, Movimiento, Negocio, Producto } from '../logica/tipos'
@@ -35,35 +36,65 @@ export interface DatosDeNegocio {
   metodos: MetodoPago[]
 }
 
+/** Límites de la base (los "check" de la migración) */
+const LIMITE = { id: 64, nombre: 120, nota: 200, descripcion: 500, telefono: 20 }
+
+/** Recorta por caracteres (no por unidades UTF-16) para no partir un emoji */
+const recortar = (texto: string, max: number) => Array.from(texto.trim()).slice(0, max).join('')
+const nombreValido = (texto: string) => recortar(texto, LIMITE.nombre) || 'Sin nombre'
+/** La base guarda 2 decimales */
+const aCentimos = (n: number) => Math.round(n * 100) / 100
+const FECHA = /^\d{4}-\d{2}-\d{2}$/
+const idValido = (id: string) => id.length >= 1 && id.length <= LIMITE.id
+
 /**
- * Convierte los datos locales en filas para subirlas a un negocio.
- * Los movimientos llevan un creado_en creciente a partir de "base" para que, al bajarlos,
- * conserven el mismo orden en que se anotaron (es el orden del historial).
+ * Convierte los datos locales en filas para subirlas a un negocio, ajustadas a los límites de la base
+ * para que un dato viejo fuera de rango no haga fallar toda la subida.
+ * Clientes y movimientos llevan un creado_en creciente a partir de "base" para que, al bajarlos,
+ * conserven el mismo orden que en el dispositivo (el del historial es el orden en que se anotó).
+ * Se omite solo lo que la base no puede guardar: montos que redondeados quedan en 0 e ids imposibles.
  */
 export function datosAFilas(datos: DatosDeNegocio, negocioId: string, base: number = Date.now()): FilasParaSubir {
   let orden = 0
+  const creadoEn = () => new Date(base + orden++).toISOString()
+  const hoy = fechaHoy(new Date(base))
+  const clientes = datos.clientes.filter((c) => idValido(c.id))
   return {
-    clientes: datos.clientes.map((c) => ({
-      negocio_id: negocioId, id: c.id, nombre: c.nombre, telefono: c.telefono, nota: c.nota,
-    })),
-    movimientos: datos.clientes.flatMap((c) => c.movimientos.map((m) => ({
+    clientes: clientes.map((c) => ({
       negocio_id: negocioId,
-      id: m.id,
-      cliente_id: c.id,
-      tipo: m.tipo,
-      descripcion: m.descripcion,
-      monto: m.monto,
-      fecha: m.fecha,
-      productos: (m.productos ?? null) as Json,
-      creado_en: new Date(base + orden++).toISOString(),
-    }))),
-    productos: datos.catalogo.map((p, i) => ({
-      negocio_id: negocioId, id: p.id, nombre: p.nombre, precio: p.precio, orden: i,
+      id: c.id,
+      nombre: nombreValido(c.nombre),
+      telefono: c.telefono.replace(/\D/g, '').slice(0, LIMITE.telefono),
+      nota: recortar(c.nota, LIMITE.nota),
+      creado_en: creadoEn(),
     })),
-    metodos: datos.metodos.map((m, i) => ({
-      negocio_id: negocioId, id: m.id, tipo: m.tipo, datos: m.datos, activo: m.activo, orden: i,
-    })),
+    movimientos: clientes.flatMap((c) => c.movimientos
+      .filter((m) => idValido(m.id) && aCentimos(m.monto) > 0)
+      .map((m) => ({
+        negocio_id: negocioId,
+        id: m.id,
+        cliente_id: c.id,
+        tipo: m.tipo,
+        descripcion: recortar(m.descripcion, LIMITE.descripcion),
+        monto: aCentimos(m.monto),
+        fecha: FECHA.test(m.fecha) ? m.fecha : hoy,
+        productos: (m.productos ?? null) as Json,
+        creado_en: creadoEn(),
+      }))),
+    productos: datos.catalogo
+      .filter((p) => idValido(p.id) && aCentimos(p.precio) > 0)
+      .map((p, i) => ({ negocio_id: negocioId, id: p.id, nombre: nombreValido(p.nombre), precio: aCentimos(p.precio), orden: i })),
+    metodos: datos.metodos
+      .filter((m) => idValido(m.id))
+      .map((m, i) => ({ negocio_id: negocioId, id: m.id, tipo: m.tipo, datos: m.datos, activo: m.activo, orden: i })),
   }
+}
+
+/** Parte una lista en lotes para no mandar miles de filas en una sola petición */
+export function dividirEnLotes<T>(lista: T[], tamano: number): T[][] {
+  const lotes: T[][] = []
+  for (let i = 0; i < lista.length; i += tamano) lotes.push(lista.slice(i, i + tamano))
+  return lotes
 }
 
 const vigente = (f: { borrado_en: string | null }) => f.borrado_en === null
