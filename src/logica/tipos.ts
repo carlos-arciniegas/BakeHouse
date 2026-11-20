@@ -12,6 +12,15 @@ export interface Movimiento {
   monto: number
   /** Fecha local en formato AAAA-MM-DD */
   fecha: string
+  /** Productos de la venta cuando se armó desde el catálogo (para reportes) */
+  productos?: LineaVenta[]
+}
+
+export interface LineaVenta {
+  nombre: string
+  cantidad: number
+  /** Precio unitario al momento de la venta */
+  precio: number
 }
 
 export interface Cliente {
@@ -24,6 +33,8 @@ export interface Cliente {
 }
 
 export interface Producto {
+  /** Fijo, para poder sincronizar; los productos viejos lo reciben al cargar */
+  id: string
   nombre: string
   precio: number
 }

@@ -1,7 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { CATALOGO_PREDETERMINADO } from '../../datos/almacenamiento'
 import { convertirABolivares, formatearBolivares, formatearMoneda, nombreMoneda, redondear, tasaActiva } from '../../logica/moneda'
-import { sinMovimiento } from '../../estado/movimiento'
+import { nuevoId, sinMovimiento } from '../../estado/movimiento'
 import { useAvisos, useTienda, useUI } from '../../estado/contextos'
 import { Icono } from '../base'
 
@@ -31,7 +31,8 @@ export function Catalogo() {
       avisar('Escribe un nombre y un precio mayor que 0', { error: true })
       return
     }
-    despachar({ tipo: 'catalogo/guardar', indice: editando, producto: { nombre: nombre.trim(), precio: redondear(valor) } })
+    const id = editando !== null ? estado.catalogo[editando].id : nuevoId('prod')
+    despachar({ tipo: 'catalogo/guardar', indice: editando, producto: { id, nombre: nombre.trim(), precio: redondear(valor) } })
     avisar(editando !== null ? 'Producto actualizado' : 'Producto agregado al catálogo')
     limpiar()
   }
@@ -106,7 +107,7 @@ export function Catalogo() {
             <p className="lista-vacia">El catálogo está vacío. Agrega tu primer producto con el formulario o restaura los originales.</p>
           )}
           {estado.catalogo.map((p, i) => (
-            <div key={i + p.nombre} className="prod">
+            <div key={p.id} className="prod">
               <span className="prod__nombre">{p.nombre}</span>
               <span className="prod__precio">
                 {moneda(p.precio)}

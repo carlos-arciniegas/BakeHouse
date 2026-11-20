@@ -54,7 +54,7 @@ describe('cargarEstado', () => {
     const estado = cargarEstado(almacen)
     expect(estado.clientes).toEqual([])
     expect(estado.negocio.pais).toBe('VE')
-    expect(estado.catalogo).toEqual([{ nombre: 'Brownie', precio: 2 }])
+    expect(estado.catalogo).toMatchObject([{ nombre: 'Brownie', precio: 2 }])
   })
 
   it('descarta movimientos inválidos y deja el teléfono en dígitos', () => {
@@ -63,6 +63,33 @@ describe('cargarEstado', () => {
     }))
     expect(estado.clientes[0].telefono).toBe('58412123')
     expect(estado.clientes[0].movimientos).toHaveLength(1)
+  })
+})
+
+describe('productos del catálogo', () => {
+  it('los productos viejos reciben un id que se guarda y no cambia en la siguiente carga', () => {
+    const almacen = memoria({ [CLAVES.catalogo]: [{ nombre: 'Galleta', precio: 1.5 }, { id: 'p_viejo', nombre: 'Brownie', precio: 2.5 }] })
+    const primera = cargarEstado(almacen).catalogo
+    expect(primera[0].id).toMatch(/^prod_/)
+    expect(primera[1].id).toBe('p_viejo')
+    expect(cargarEstado(almacen).catalogo.map((p) => p.id)).toEqual(primera.map((p) => p.id))
+  })
+
+  it('el catálogo de ejemplo trae ids fijos', () => {
+    expect(cargarEstado(memoria()).catalogo.map((p) => p.id)).toEqual(['prod_base_1', 'prod_base_2', 'prod_base_3', 'prod_base_4', 'prod_base_5', 'prod_base_6'])
+  })
+})
+
+describe('productos de una venta', () => {
+  it('se conservan al cargar y se descartan las líneas inválidas', () => {
+    const estado = cargarEstado(memoria({
+      [CLAVES.clientes]: { clientes: [{ id: 'c1', nombre: 'Ana', telefono: '584121234567', movimientos: [
+        { id: 'm1', tipo: 'venta', descripcion: '2x Galleta', monto: 3, fecha: '2026-11-20', productos: [{ nombre: 'Galleta', cantidad: 2, precio: 1.5 }, { nombre: '', cantidad: 1 }] },
+        { id: 'm2', tipo: 'venta', descripcion: 'A mano', monto: 5, fecha: '2026-11-20' },
+      ] }] },
+    }))
+    expect(estado.clientes[0].movimientos[0].productos).toEqual([{ nombre: 'Galleta', cantidad: 2, precio: 1.5 }])
+    expect(estado.clientes[0].movimientos[1]).not.toHaveProperty('productos')
   })
 })
 

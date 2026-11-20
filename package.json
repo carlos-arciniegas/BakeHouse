@@ -13,9 +13,11 @@
     "lint": "oxlint",
     "typecheck": "tsc -b",
     "test:e2e": "playwright test",
-    "test:bd": "bash scripts/probar-bd.sh"
+    "test:bd": "bash scripts/probar-bd.sh",
+    "tipos:bd": "echo '// Generado con: npm run tipos:bd (no editar a mano)' > src/datos/baseDeDatos.ts && supabase gen types typescript --remote=kvvzdbycnabpkkszcpge --schema public >> src/datos/baseDeDatos.ts"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.119.2",
     "react": "^19.3.1",
     "react-dom": "^19.3.1"
   },

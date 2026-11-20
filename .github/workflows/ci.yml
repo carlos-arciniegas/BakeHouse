@@ -21,6 +21,10 @@ jobs:
     name: Lint, tipos y pruebas
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Conexión a Supabase (variables del repositorio; la clave es la pública)
+    env:
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${{ vars.VITE_SUPABASE_PUBLISHABLE_KEY }}
     steps:
       - uses: actions/checkout@v7
 

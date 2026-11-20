@@ -1,6 +1,6 @@
 import { esTipoPago, migrarPagoMovil, type PagoMovilAntiguo } from '../logica/metodosPago'
 import { esCodigoPais, NEGOCIO_PREDETERMINADO } from '../logica/paises'
-import type { Cliente, ConfigBCV, MetodoPago, Movimiento, Negocio, Producto } from '../logica/tipos'
+import type { Cliente, ConfigBCV, LineaVenta, MetodoPago, Movimiento, Negocio, Producto } from '../logica/tipos'
 
 /**
  * Claves de localStorage. Empiezan por "pachons_" porque así las creó la primera versión;
@@ -17,12 +17,12 @@ export const CLAVES = {
 } as const
 
 export const CATALOGO_PREDETERMINADO: Producto[] = [
-  { nombre: 'Galleta Choco Chip 30g', precio: 1.5 },
-  { nombre: 'Galleta Doble Chocolate 30g', precio: 1.5 },
-  { nombre: 'Brownie Fudge 7x7', precio: 2.5 },
-  { nombre: 'Brownie Bites (x4)', precio: 3 },
-  { nombre: 'Porción Ponqué', precio: 2 },
-  { nombre: 'Helado Ninja Creami', precio: 3.5 },
+  { id: 'prod_base_1', nombre: 'Galleta Choco Chip 30g', precio: 1.5 },
+  { id: 'prod_base_2', nombre: 'Galleta Doble Chocolate 30g', precio: 1.5 },
+  { id: 'prod_base_3', nombre: 'Brownie Fudge 7x7', precio: 2.5 },
+  { id: 'prod_base_4', nombre: 'Brownie Bites (x4)', precio: 3 },
+  { id: 'prod_base_5', nombre: 'Porción Ponqué', precio: 2 },
+  { id: 'prod_base_6', nombre: 'Helado Ninja Creami', precio: 3.5 },
 ]
 
 export interface EstadoGuardado {
@@ -55,18 +55,31 @@ export function guardarJSON(almacen: Almacen, clave: string, valor: unknown): vo
 
 // ---------- Saneamiento: los datos vienen de localStorage o de un archivo, no se confía en su forma
 
-function sanearMovimiento(m: unknown): Movimiento | null {
+const idAleatorio = (prefijo: string) => prefijo + '_' + Math.random().toString(36).slice(2, 12)
+
+function sanearLineas(lista: unknown): LineaVenta[] | undefined {
+  if (!Array.isArray(lista)) return undefined
+  const lineas = lista
+    .filter((l) => l && (l as LineaVenta).nombre && Number((l as LineaVenta).cantidad) > 0)
+    .map((l: LineaVenta) => ({ nombre: String(l.nombre), cantidad: Math.round(Number(l.cantidad)), precio: Number(l.precio) || 0 }))
+  return lineas.length ? lineas : undefined
+}
+
+export function sanearMovimiento(m: unknown): Movimiento | null {
   const x = m as Partial<Movimiento>
   if (!x || (x.tipo !== 'venta' && x.tipo !== 'abono')) return null
   const monto = Number(x.monto)
   if (!(monto > 0)) return null
-  return {
-    id: String(x.id ?? 'mov_' + Math.random().toString(36).slice(2)),
+  const movimiento: Movimiento = {
+    id: String(x.id ?? idAleatorio('mov')),
     tipo: x.tipo,
     descripcion: String(x.descripcion ?? ''),
     monto,
     fecha: String(x.fecha ?? ''),
   }
+  const productos = sanearLineas(x.productos)
+  if (productos) movimiento.productos = productos
+  return movimiento
 }
 
 export function sanearClientes(lista: unknown): Cliente[] | null {
@@ -88,7 +101,7 @@ export function sanearCatalogo(lista: unknown): Producto[] | null {
   if (!Array.isArray(lista)) return null
   return lista
     .filter((p) => p && (p as Producto).nombre && Number((p as Producto).precio) > 0)
-    .map((p: Producto) => ({ nombre: String(p.nombre), precio: Number(p.precio) }))
+    .map((p: Producto) => ({ id: p.id ? String(p.id) : idAleatorio('prod'), nombre: String(p.nombre), precio: Number(p.precio) }))
 }
 
 export function sanearMetodos(lista: unknown): MetodoPago[] | null {
@@ -127,9 +140,16 @@ export function cargarEstado(almacen: Almacen): EstadoGuardado {
     if (metodos.length) guardarJSON(almacen, CLAVES.metodos, metodos)
   }
 
+  // Los productos guardados antes de tener id lo reciben ahora y se guarda, para que no cambie en cada carga
+  const catalogoCrudo = leerJSON(almacen, CLAVES.catalogo)
+  const catalogo = sanearCatalogo(catalogoCrudo) ?? CATALOGO_PREDETERMINADO.map((p) => ({ ...p }))
+  if (Array.isArray(catalogoCrudo) && catalogoCrudo.some((p) => p && !(p as Producto).id)) {
+    guardarJSON(almacen, CLAVES.catalogo, catalogo)
+  }
+
   return {
     clientes: sanearClientes(datos?.clientes) ?? [],
-    catalogo: sanearCatalogo(leerJSON(almacen, CLAVES.catalogo)) ?? CATALOGO_PREDETERMINADO.map((p) => ({ ...p })),
+    catalogo,
     metodos,
     negocio: sanearNegocio(leerJSON(almacen, CLAVES.negocio)) ?? { ...NEGOCIO_PREDETERMINADO },
     bcv: sanearBCV(leerJSON(almacen, CLAVES.bcv)),

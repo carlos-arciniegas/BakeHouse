@@ -54,7 +54,10 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
       return
     }
     const valor = redondear(montoNum)
-    const movimientos: Movimiento[] = [{ id: nuevoId('mov'), tipo: 'venta', descripcion: descripcion.trim(), monto: valor, fecha }]
+    const venta: Movimiento = { id: nuevoId('mov'), tipo: 'venta', descripcion: descripcion.trim(), monto: valor, fecha }
+    const { lineas } = describirSeleccion(seleccion, estado.catalogo)
+    if (lineas.length) venta.productos = lineas
+    const movimientos: Movimiento[] = [venta]
     if (pagada) {
       movimientos.push({ id: nuevoId('mov'), tipo: 'abono', descripcion: 'Pago (' + metodo + ')', monto: valor, fecha })
       recordarUltimoMetodo(localStorage, metodo)
@@ -93,7 +96,7 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
           {estado.catalogo.map((p, i) => {
             const cantidad = seleccion[i] ?? 0
             return (
-              <span key={i + p.nombre} className="chip-grupo">
+              <span key={p.id} className="chip-grupo">
                 {cantidad > 0 && (
                   <button type="button" className="chip__menos" aria-label={'Quitar un ' + p.nombre} onClick={() => cambiarSeleccion(restarProducto(seleccion, i))}>
                     <Icono nombre="menos" chico />

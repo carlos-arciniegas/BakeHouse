@@ -3,9 +3,9 @@ import type { Producto } from './tipos'
 import { describirSeleccion, restarProducto, sumarProducto, type Seleccion } from './venta'
 
 const catalogo: Producto[] = [
-  { nombre: 'Galleta Choco Chip 30g', precio: 1.5 },
-  { nombre: 'Galleta Doble Chocolate 30g', precio: 1.5 },
-  { nombre: 'Brownie Fudge 7x7', precio: 2.5 },
+  { id: 'p1', nombre: 'Galleta Choco Chip 30g', precio: 1.5 },
+  { id: 'p2', nombre: 'Galleta Doble Chocolate 30g', precio: 1.5 },
+  { id: 'p3', nombre: 'Brownie Fudge 7x7', precio: 2.5 },
 ]
 
 describe('selección de productos', () => {
@@ -14,7 +14,15 @@ describe('selección de productos', () => {
     sel = sumarProducto(sel, 0)
     sel = sumarProducto(sel, 0)
     sel = sumarProducto(sel, 2)
-    expect(describirSeleccion(sel, catalogo)).toEqual({ descripcion: '2x Galleta Choco Chip 30g + 1x Brownie Fudge 7x7', total: 5.5 })
+    expect(describirSeleccion(sel, catalogo)).toEqual({
+      descripcion: '2x Galleta Choco Chip 30g + 1x Brownie Fudge 7x7',
+      total: 5.5,
+      // Las líneas quedan guardadas con la venta para los reportes
+      lineas: [
+        { nombre: 'Galleta Choco Chip 30g', cantidad: 2, precio: 1.5 },
+        { nombre: 'Brownie Fudge 7x7', cantidad: 1, precio: 2.5 },
+      ],
+    })
   })
 
   it('restar baja la cantidad y en 0 quita el producto', () => {
@@ -38,6 +46,6 @@ describe('selección de productos', () => {
   })
 
   it('sin selección no hay descripción ni total', () => {
-    expect(describirSeleccion({}, catalogo)).toEqual({ descripcion: '', total: 0 })
+    expect(describirSeleccion({}, catalogo)).toEqual({ descripcion: '', total: 0, lineas: [] })
   })
 })

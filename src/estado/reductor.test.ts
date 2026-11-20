@@ -8,7 +8,7 @@ const mov = (id: string, tipo: Movimiento['tipo'], monto: number): Movimiento =>
 
 const inicial: EstadoGuardado = {
   clientes: [{ id: 'c1', nombre: 'Ana', telefono: '584121234567', nota: '', movimientos: [mov('a', 'venta', 5), mov('b', 'venta', 3)] }],
-  catalogo: [{ nombre: 'Galleta', precio: 1.5 }, { nombre: 'Brownie', precio: 2.5 }],
+  catalogo: [{ id: 'p1', nombre: 'Galleta', precio: 1.5 }, { id: 'p2', nombre: 'Brownie', precio: 2.5 }],
   metodos: [{ id: 'm1', tipo: 'zelle', activo: true, datos: { contacto: 'a@b.c' } }],
   negocio: { nombre: 'Pachon\'s', pais: 'VE' },
   bcv: { tasa: 0, actualizado: '' },
@@ -35,9 +35,9 @@ describe('reductor', () => {
   })
 
   it('el catálogo agrega, edita, elimina y restaura por posición', () => {
-    let e = reductor(inicial, { tipo: 'catalogo/guardar', indice: null, producto: { nombre: 'Ponqué', precio: 2 } })
+    let e = reductor(inicial, { tipo: 'catalogo/guardar', indice: null, producto: { id: 'p3', nombre: 'Ponqué', precio: 2 } })
     expect(e.catalogo.map((p) => p.nombre)).toEqual(['Galleta', 'Brownie', 'Ponqué'])
-    e = reductor(e, { tipo: 'catalogo/guardar', indice: 0, producto: { nombre: 'Galleta grande', precio: 2 } })
+    e = reductor(e, { tipo: 'catalogo/guardar', indice: 0, producto: { id: 'p1', nombre: 'Galleta grande', precio: 2 } })
     expect(e.catalogo[0].nombre).toBe('Galleta grande')
     const quitado = e.catalogo[1]
     e = reductor(e, { tipo: 'catalogo/eliminar', indice: 1 })
