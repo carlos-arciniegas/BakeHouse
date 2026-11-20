@@ -39,12 +39,15 @@ Proyecto `kvvzdbycnabpkkszcpge`, región **eu-west-1 (Irlanda)**. Desde Venezuel
 - Aplicada desde el **SQL Editor** del panel: `npx supabase db push --remote` no logró conectarse (el pooler `aws-1-eu-west-1.pooler.supabase.com` corta la conexión antes de autenticar, también con la contraseña de la base). Verificado desde la API con la clave pública: las 6 tablas existen y sin sesión todo responde `permission denied`.
 - **Pendiente:** cuando la CLI se conecte, registrar la migración como aplicada con `npx supabase migration repair --status applied 20261120200000 --remote`, para que las siguientes se suban con `db push`. Mientras tanto, las migraciones nuevas se aplican también desde el SQL Editor.
 
-### Fase 2: capa de datos en la app
+### Fase 2: capa de datos en la app (hecho)
 - `@supabase/supabase-js` y variables `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (`.env.local` en desarrollo; variables del repositorio en GitHub Actions).
 - `src/datos/nube.ts`: convierte entre los tipos de la app y las filas de la base (funciones puras, con pruebas).
 - Las ventas guardan también sus productos (`productos`) cuando se arman desde el catálogo.
 
-### Fase 3: inicio de sesión y negocio
+### Fase 3: inicio de sesión y negocio (hecho, oculto en producción)
+- Sección "Guardar en la nube" en Ajustes (`CuentaNube.tsx`, hooks en `nube.ts`, lógica en `src/datos/cuenta.ts`). **Oculta en la app publicada** hasta terminar la fase 5: se ve en desarrollo o abriendo la app una vez con `?nube=1`.
+- Si la cuenta tiene un solo negocio se conecta solo; el negocio conectado se guarda en el dispositivo (`pachons_nube_negocio_v1`).
+- Pruebas con Playwright simulando Supabase (`e2e/nube.spec.ts`): no envían correos ni tocan el proyecto real.
 - Pantalla para entrar con el correo (enlace mágico).
 - Primer uso: crear el negocio con `crear_negocio()`, o entrar al que ya existe.
 - Sin sesión la app sigue funcionando como hoy, solo en el dispositivo. La nube es opcional: nadie pierde lo que ya tiene.

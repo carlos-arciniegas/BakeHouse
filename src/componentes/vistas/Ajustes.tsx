@@ -8,6 +8,7 @@ import { useAvisos, useTienda, useUI } from '../../estado/contextos'
 import { Icono } from '../base'
 import { useClienteEjemplo, useSincronizarBCV } from '../ganchos'
 import { useInstalarApp } from '../instalar'
+import { CuentaNube } from './CuentaNube'
 
 function FormularioNegocio() {
   const { estado, despachar, pais } = useTienda()
@@ -170,6 +171,7 @@ export function Ajustes() {
 
       <div className="panel">
         <FormularioNegocio key={estado.negocio.nombre + estado.negocio.pais} />
+        <CuentaNube />
         <SeccionInstalar />
 
         <section className="seccion">
