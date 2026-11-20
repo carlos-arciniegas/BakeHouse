@@ -1,0 +1,30 @@
+# Claude Code: configuración personal (no compartir)
+.claude/settings.local.json
+
+# Capturas de pantalla de revisión de diseño
+capturas/
+
+# Dependencias
+node_modules/
+
+# Builds
+dist/
+build/
+
+# Variables de entorno y secretos
+.env
+.env.*
+!.env.example
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# Editores
+.vscode/*
+!.vscode/extensions.json
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
