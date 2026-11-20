@@ -11,6 +11,9 @@ node_modules/
 dist/
 build/
 
+# Supabase CLI: datos locales de la conexión
+supabase/.temp/
+
 # Resultados de Playwright
 test-results/
 playwright-report/

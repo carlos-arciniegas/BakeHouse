@@ -26,15 +26,18 @@ El esquema está en `supabase/migrations/20261120200000_esquema_inicial.sql` y s
 
 ## Fases
 
-### Fase 0: preparar el proyecto en Supabase (lo hace el dueño de la cuenta)
-1. Crear el proyecto. Región sugerida: **East US (N. Virginia)**, la de menor latencia desde Caracas. Para clientes en Europa conviene un proyecto aparte en una región europea (RGPD).
+### Fase 0: preparar el proyecto en Supabase (hecho)
+Proyecto `kvvzdbycnabpkkszcpge`, región **eu-west-1 (Irlanda)**. Desde Venezuela agrega ~100–150 ms a cada sincronización, que pasa en segundo plano; para clientes europeos deja los datos en la UE.
+
+1. Crear el proyecto.
 2. Iniciar sesión con la CLI en esta computadora: `npx supabase login` (abre el navegador) y `npx supabase link --project-ref <ref>`.
 3. En *Authentication → URL Configuration*: Site URL `https://carlos-arciniegas.github.io/BakeHouse/` y, como URL de redirección extra, `http://localhost:5173/BakeHouse/`.
 4. Pasar a la app la **Project URL** y la **clave pública** (anon / publishable). La clave secreta (service_role) y la contraseña de la base **nunca** van en la app ni se comparten.
 
-### Fase 1: esquema (hecho, falta aplicarlo)
-- Migración con tablas, triggers, funciones y políticas, probada localmente.
-- Aplicar con `npx supabase db push`.
+### Fase 1: esquema (hecho)
+- Migración con tablas, triggers, funciones y políticas, probada localmente (`npm run test:bd`).
+- Aplicada desde el **SQL Editor** del panel: `npx supabase db push --remote` no logró conectarse (el pooler `aws-1-eu-west-1.pooler.supabase.com` corta la conexión antes de autenticar, también con la contraseña de la base). Verificado desde la API con la clave pública: las 6 tablas existen y sin sesión todo responde `permission denied`.
+- **Pendiente:** cuando la CLI se conecte, registrar la migración como aplicada con `npx supabase migration repair --status applied 20261120200000 --remote`, para que las siguientes se suban con `db push`. Mientras tanto, las migraciones nuevas se aplican también desde el SQL Editor.
 
 ### Fase 2: capa de datos en la app
 - `@supabase/supabase-js` y variables `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (`.env.local` en desarrollo; variables del repositorio en GitHub Actions).
@@ -58,6 +61,7 @@ El esquema está en `supabase/migrations/20261120200000_esquema_inicial.sql` y s
 - Pruebas: la lógica de cola y de mezcla con Vitest; los flujos (sin conexión → con conexión, dos dispositivos) con Playwright contra un Supabase local.
 
 ### Fase 6: pasar a Pachon's
+0. **Requisito:** configurar un SMTP propio (por ejemplo Resend) en *Authentication → SMTP*. El correo que trae Supabase es de prueba: 2 correos por hora para todo el proyecto, y el inicio de sesión por enlace mágico depende de esos correos.
 1. Descargar una copia de seguridad.
 2. Crear su cuenta, entrar y subir sus datos (fase 4).
 3. Confirmar en un segundo dispositivo que ve lo mismo.
@@ -69,6 +73,8 @@ El esquema está en `supabase/migrations/20261120200000_esquema_inicial.sql` y s
 - **Con el primer negocio que pague: Pro, $25/mes.** Copias diarias, sin pausas, tope de gasto activado por defecto. Alcanza para cientos de negocios (cada uno ocupa ~10 MB al año).
 
 ## Pendiente para más adelante
+
+- Inicio de sesión con Google: credenciales OAuth en Google Cloud Console y activarlo en *Authentication → Providers*; en la app es un botón más (`signInWithOAuth`).
 
 - Invitar a una ayudante por correo (el modelo ya lo soporta; falta la función y la pantalla).
 - Reportes con los productos de cada venta.
