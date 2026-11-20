@@ -1,0 +1,2097 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="theme-color" content="#3E2723" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pachon's Bakehouse" />
+  <title>Pachon's Bakehouse — Control de Deudas y Ventas</title>
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+            serif: ['Georgia', 'Cambria', 'serif']
+          },
+          colors: {
+            cocoa: {
+              700: '#5D4037',
+              800: '#4E342E',
+              900: '#3E2723',
+              950: '#261613'
+            },
+            cream: {
+              50: '#FDFBF7',
+              100: '#F8F2E8',
+              200: '#EFE4D2',
+              300: '#E2D0B5'
+            },
+            caramel: {
+              400: '#E09F3E',
+              500: '#C87D28',
+              600: '#A6631B'
+            },
+            whatsapp: {
+              500: '#25D366',
+              600: '#1EBE5D'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Fuente Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+
+  <style>
+    * { -webkit-tap-highlight-color: transparent; }
+    body { font-family: 'Inter', system-ui, sans-serif; background-color: #F8F2E8; color: #261613; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .anim-in { animation: fadeSlide 0.2s ease-out forwards; }
+  </style>
+</head>
+<body class="min-h-screen flex bg-cream-100 text-cocoa-950 overflow-x-hidden">
+
+  <!-- =====================================================================
+       OVERLAY OSCURO PARA BARRA LATERAL EN MÓVIL
+       ===================================================================== -->
+  <div id="sidebarOverlay" onclick="cerrarSidebar()" class="fixed inset-0 bg-cocoa-950/60 backdrop-blur-xs z-40 hidden md:hidden transition-opacity"></div>
+
+  <!-- =====================================================================
+       BARRA LATERAL RESPONSIVA (FIJA EN DESKTOP / DESLIZABLE EN MÓVIL)
+       ===================================================================== -->
+  <aside id="appSidebar" class="fixed md:sticky top-0 left-0 z-50 h-screen w-64 bg-cocoa-900 text-cream-50 flex flex-col justify-between shadow-2xl md:shadow-md border-r border-cocoa-800 transform -translate-x-full md:translate-x-0 transition-transform duration-200 ease-out shrink-0">
+    <div>
+      <!-- Logo / Marca Pachon's Bakehouse -->
+      <div class="px-5 py-5 border-b border-cocoa-800 flex items-center justify-between gap-2">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="w-10 h-10 rounded-2xl bg-caramel-500 flex items-center justify-center text-white shadow shrink-0">
+            <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 2a10 10 0 1 0 10 10 4 4 0 0 1-5-5 4 4 0 0 1-5-5" />
+              <path d="M8.5 8.5v.01" /><path d="M16 15.5v.01" /><path d="M12 12v.01" /><path d="M11 17v.01" /><path d="M7 14v.01" />
+            </svg>
+          </div>
+          <div class="min-w-0">
+            <h1 class="font-serif text-base font-bold tracking-tight leading-tight text-cream-50 truncate">
+              Pachon's Bakehouse
+            </h1>
+            <p class="text-[11px] text-cream-300 font-medium truncate">
+              Caracas • Cobros &amp; Dulces
+            </p>
+          </div>
+        </div>
+        <button type="button" onclick="cerrarSidebar()" class="md:hidden text-cream-300 hover:text-white p-1.5 rounded-lg font-bold text-sm" aria-label="Cerrar menú">
+          ✕
+        </button>
+      </div>
+
+      <!-- Navegación Principal -->
+      <nav class="p-3.5 space-y-1.5" aria-label="Menú principal">
+        <button type="button" onclick="cambiarVista('cuentas')" id="nav-cuentas" class="nav-item w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition bg-caramel-500 text-white shadow-sm">
+          <span class="text-base">📋</span>
+          <span class="truncate">Cuentas y Cobros</span>
+        </button>
+
+        <button type="button" onclick="cambiarVista('catalogo')" id="nav-catalogo" class="nav-item w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition text-cream-200 hover:bg-cocoa-800 hover:text-white">
+          <span class="text-base">🍪</span>
+          <span class="truncate">Catálogo de Dulces</span>
+        </button>
+
+        <button type="button" onclick="cambiarVista('pagomovil')" id="nav-pagomovil" class="nav-item w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition text-cream-200 hover:bg-cocoa-800 hover:text-white">
+          <span class="text-base">📲</span>
+          <span class="truncate">Datos Pago Móvil</span>
+        </button>
+
+        <button type="button" onclick="cambiarVista('respaldo')" id="nav-respaldo" class="nav-item w-full flex items-center gap-3 px-3.5 py-3 rounded-xl text-sm font-semibold transition text-cream-200 hover:bg-cocoa-800 hover:text-white">
+          <span class="text-base">💾</span>
+          <span class="truncate">Respaldo / Excel</span>
+        </button>
+      </nav>
+    </div>
+
+    <!-- Pie de Barra Lateral: Estado Pago Móvil + Instalar PWA -->
+    <div class="p-4 border-t border-cocoa-800 space-y-3">
+      <div class="bg-cocoa-950/70 rounded-xl p-3 border border-cocoa-800 space-y-1">
+        <div class="flex items-center justify-between text-[11px]">
+          <span class="text-cream-300 font-medium">Pago Móvil en Cobros:</span>
+          <span id="sidebarBadgePM" class="font-bold text-amber-400">Sin datos</span>
+        </div>
+        <p id="sidebarResumenPM" class="text-[11px] text-cream-300/75 truncate">Configúralo en Datos Pago Móvil</p>
+      </div>
+
+      <button type="button" id="btnInstallPWA" onclick="instalarPWA()" class="hidden w-full items-center justify-center gap-2 bg-cream-50 hover:bg-cream-200 text-cocoa-950 text-xs font-bold py-2.5 px-3 rounded-xl shadow transition active:scale-95">
+        <svg class="w-4 h-4 text-caramel-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+          <polyline points="7 10 12 15 17 10" />
+          <line x1="12" y1="15" x2="12" y2="3" />
+        </svg>
+        <span>Instalar App en Inicio</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- =====================================================================
+       CONTENEDOR PRINCIPAL DERECHO (HEADER BCV + VISTAS)
+       ===================================================================== -->
+  <div class="flex-1 flex flex-col min-w-0">
+
+    <!-- CABECERA SUPERIOR LIMPIA CON TASA BCV EN VIVO -->
+    <header class="sticky top-0 z-30 bg-white/95 backdrop-blur-xs border-b border-cream-200 shadow-2xs">
+      <div class="max-w-5xl mx-auto px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+        <!-- Botón Hamburguesa (Móvil) + Título de Vista -->
+        <div class="flex items-center gap-3 min-w-0">
+          <button type="button" onclick="abrirSidebar()" class="md:hidden p-2 rounded-xl bg-cocoa-900 text-cream-50 hover:bg-cocoa-800 active:scale-95 transition text-base font-bold leading-none" aria-label="Abrir menú">
+            ☰
+          </button>
+          <div class="min-w-0">
+            <h2 id="headerViewTitle" class="font-serif text-lg sm:text-xl font-bold text-cocoa-950 truncate">
+              📋 Cuentas y Cobros
+            </h2>
+            <p id="headerViewSubtitle" class="text-[11px] text-cocoa-700 truncate hidden sm:block">
+              Gestiona fiados, abonos y recordatorios por WhatsApp
+            </p>
+          </div>
+        </div>
+
+        <!-- Control Tasa BCV (Badge + Input Manual + Sincronizar) -->
+        <div class="flex flex-wrap items-center gap-2 bg-cream-50 border border-cream-200 px-3 py-1.5 rounded-2xl">
+          <div class="flex items-center gap-1.5">
+            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-cocoa-900 text-caramel-400 text-[11px] font-bold">
+              <span>🏛️ BCV</span>
+            </span>
+            <div class="relative flex items-center">
+              <span class="absolute left-2 text-[11px] font-bold text-cocoa-700">Bs.</span>
+              <input
+                type="number"
+                id="inputTasaBCV"
+                step="0.01"
+                min="0"
+                oninput="actualizarTasaManual(this.value)"
+                placeholder="0.00"
+                aria-label="Tasa BCV en Bolívares por Dólar"
+                class="w-24 sm:w-28 pl-7 pr-2 py-1 bg-white border border-cream-300 rounded-lg text-cocoa-950 font-extrabold text-xs focus:outline-none focus:ring-2 focus:ring-caramel-500"
+              />
+            </div>
+          </div>
+
+          <button type="button" id="btnSincronizarBCV" onclick="sincronizarTasaBCV(false)" class="inline-flex items-center gap-1 bg-caramel-500 hover:bg-caramel-600 text-white text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-2xs transition active:scale-95">
+            <svg id="iconoSyncBCV" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+            </svg>
+            <span>Sincronizar BCV</span>
+          </button>
+
+          <span id="textoUltimaActBCV" class="text-[10px] text-cocoa-700/80 hidden lg:inline">
+            Sin sincronizar
+          </span>
+        </div>
+      </div>
+    </header>
+
+    <!-- ÁREA DE CONTENIDO DE VISTAS -->
+    <main class="flex-1 max-w-5xl w-full mx-auto px-4 py-5 pb-20">
+
+      <!-- ===================================================================
+           VISTA 1: CUENTAS Y COBROS (DASHBOARD PRINCIPAL)
+           =================================================================== -->
+      <section id="view-cuentas" class="space-y-5 anim-in">
+        <!-- Tarjetas KPI -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <!-- Total Por Cobrar -->
+          <div class="bg-white rounded-2xl p-4 shadow-2xs border border-cream-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-cocoa-700">Total por Cobrar</span>
+              <span class="text-base">💰</span>
+            </div>
+            <div id="statPorCobrar" class="text-2xl font-extrabold text-cocoa-950 mt-1">$0.00</div>
+            <div id="statPorCobrarBs" class="text-xs font-bold text-caramel-600 mt-0.5">Bs. 0,00</div>
+          </div>
+
+          <!-- Total Cobrado -->
+          <div class="bg-white rounded-2xl p-4 shadow-2xs border border-cream-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-cocoa-700">Total Cobrado</span>
+              <span class="text-base">✅</span>
+            </div>
+            <div id="statCobrado" class="text-2xl font-extrabold text-emerald-700 mt-1">$0.00</div>
+            <div id="statCobradoBs" class="text-xs font-medium text-cocoa-700/80 mt-0.5">Bs. 0,00</div>
+          </div>
+
+          <!-- Clientes con Saldo Pendiente -->
+          <div class="bg-white rounded-2xl p-4 shadow-2xs border border-cream-200 flex flex-col justify-between">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-cocoa-700">Clientes con Deuda</span>
+              <span class="text-base">👥</span>
+            </div>
+            <div id="statDeudores" class="text-2xl font-extrabold text-cocoa-950 mt-1">0</div>
+            <div id="statTotalClientes" class="text-xs text-cocoa-700/80 mt-0.5">de 0 clientes registrados</div>
+          </div>
+        </div>
+
+        <!-- Barra de Búsqueda, Filtros y Botón + Nuevo Cliente -->
+        <div class="bg-white p-4 rounded-2xl shadow-2xs border border-cream-200 space-y-3">
+          <div class="flex flex-col sm:flex-row gap-2.5">
+            <div class="relative flex-1">
+              <svg class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-cocoa-700/50" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                id="inputBuscar"
+                oninput="renderizarClientes()"
+                placeholder="Buscar cliente por nombre o teléfono..."
+                class="w-full pl-10 pr-9 py-2.5 bg-cream-50 border border-cream-200 rounded-xl text-sm text-cocoa-950 placeholder:text-cocoa-700/50 focus:outline-none focus:ring-2 focus:ring-caramel-500"
+              />
+              <button type="button" id="btnLimpiarBusqueda" onclick="limpiarBusqueda()" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-cocoa-700/60 hover:text-cocoa-950 p-1 text-xs font-bold">
+                ✕
+              </button>
+            </div>
+
+            <button type="button" onclick="abrirModalCliente()" class="inline-flex items-center justify-center gap-2 bg-cocoa-900 hover:bg-cocoa-800 text-cream-50 font-semibold px-4 py-2.5 rounded-xl shadow-2xs transition active:scale-95 text-sm shrink-0">
+              <span class="text-caramel-400 font-bold">+</span>
+              <span>Nuevo Cliente</span>
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2 overflow-x-auto no-scrollbar">
+            <button type="button" onclick="cambiarFiltro('todos')" id="filtro-todos" class="filtro-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold transition bg-cocoa-900 text-cream-50">
+              Todos
+            </button>
+            <button type="button" onclick="cambiarFiltro('deuda')" id="filtro-deuda" class="filtro-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold transition bg-cream-100 text-cocoa-800 hover:bg-cream-200">
+              Con Deuda
+            </button>
+            <button type="button" onclick="cambiarFiltro('solventes')" id="filtro-solventes" class="filtro-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold transition bg-cream-100 text-cocoa-800 hover:bg-cream-200">
+              Solventes
+            </button>
+          </div>
+        </div>
+
+        <!-- Lista de Clientes -->
+        <div id="listaClientes" class="space-y-3.5"></div>
+      </section>
+
+      <!-- ===================================================================
+           VISTA 2: CATÁLOGO DE DULCES (VISTA DEDICADA)
+           =================================================================== -->
+      <section id="view-catalogo" class="hidden space-y-5 anim-in">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <!-- Formulario Agregar / Editar Producto -->
+          <div class="lg:col-span-5">
+            <div class="bg-white rounded-2xl p-5 shadow-2xs border border-cream-200 space-y-4">
+              <div class="flex items-center justify-between border-b border-cream-200 pb-3">
+                <h3 id="tituloFormCatalogo" class="font-serif text-base font-bold text-cocoa-950">
+                  Agregar Nuevo Dulce
+                </h3>
+                <button type="button" id="btnCancelarEdicionCatalogo" onclick="cancelarEdicionCatalogo()" class="hidden text-xs font-bold text-rose-600 hover:underline">
+                  Cancelar edición
+                </button>
+              </div>
+
+              <form id="formProductoCatalogo" onsubmit="guardarProductoCatalogo(event)" class="space-y-4">
+                <input type="hidden" id="catalogoEditIndex" value="-1" />
+
+                <div>
+                  <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Nombre del Producto *</label>
+                  <input type="text" id="catalogoNombre" required placeholder="Ej. Galleta Choco Chip 30g" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Precio en USD ($) *</label>
+                  <input type="number" id="catalogoPrecio" oninput="actualizarPreviewPrecioCatalogo()" step="0.01" min="0.01" required placeholder="1.50" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-bold text-cocoa-950 focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+                  <p id="previewPrecioCatalogoBs" class="text-xs font-semibold text-caramel-600 mt-1.5">
+                    Equivale a: Bs. 0,00
+                  </p>
+                </div>
+
+                <button type="submit" id="btnGuardarCatalogo" class="w-full py-3 rounded-xl bg-caramel-500 hover:bg-caramel-600 text-white font-semibold text-sm shadow-2xs transition active:scale-95">
+                  + Agregar al Catálogo
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Lista Completa de Productos -->
+          <div class="lg:col-span-7">
+            <div class="bg-white rounded-2xl p-5 shadow-2xs border border-cream-200 space-y-4">
+              <div class="flex flex-wrap items-center justify-between gap-2 border-b border-cream-200 pb-3">
+                <div>
+                  <h3 class="font-serif text-base font-bold text-cocoa-950">
+                    Productos Disponibles (<span id="contadorCatalogo">0</span>)
+                  </h3>
+                  <p class="text-xs text-cocoa-700">Aparecen como botones rápidos al anotar una venta.</p>
+                </div>
+                <button type="button" onclick="confirmarRestaurarCatalogo()" class="px-3 py-1.5 rounded-xl bg-cream-100 hover:bg-cream-200 text-cocoa-900 text-xs font-semibold transition">
+                  Restaurar predeterminados
+                </button>
+              </div>
+
+              <div id="listaProductosCatalogo" class="space-y-2.5"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           VISTA 3: DATOS PAGO MÓVIL (VISTA DEDICADA)
+           =================================================================== -->
+      <section id="view-pagomovil" class="hidden space-y-5 anim-in">
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+          <!-- Formulario Configuración Pago Móvil -->
+          <div class="lg:col-span-7">
+            <div class="bg-white rounded-2xl p-5 shadow-2xs border border-cream-200 space-y-4">
+              <div class="border-b border-cream-200 pb-3">
+                <h3 class="font-serif text-base font-bold text-cocoa-950">Configuración de Pago Móvil</h3>
+                <p class="text-xs text-cocoa-700 mt-0.5">Guarda los datos de recepción de Pachon's Bakehouse.</p>
+              </div>
+
+              <form id="formPagoMovil" onsubmit="guardarPagoMovil(event)" class="space-y-4">
+                <div>
+                  <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Banco *</label>
+                  <select id="pmBanco" onchange="toggleBancoOtro(); actualizarPreviewPagoMovil();" required class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-caramel-500">
+                    <option value="Banesco (0134)">Banesco (0134)</option>
+                    <option value="Mercantil (0105)">Mercantil (0105)</option>
+                    <option value="Banco de Venezuela (0102)">Banco de Venezuela (0102)</option>
+                    <option value="BBVA Provincial (0108)">BBVA Provincial (0108)</option>
+                    <option value="Bancamiga (0172)">Bancamiga (0172)</option>
+                    <option value="BNC (0191)">BNC - Banco Nacional de Crédito (0191)</option>
+                    <option value="Bancaribe (0114)">Bancaribe (0114)</option>
+                    <option value="Banplus (0174)">Banplus (0174)</option>
+                    <option value="Otro">Otro banco...</option>
+                  </select>
+                  <input type="text" id="pmBancoOtro" oninput="actualizarPreviewPagoMovil()" placeholder="Nombre y código del banco (Ej. Exterior 0115)" class="hidden mt-2 w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Teléfono *</label>
+                    <input type="tel" id="pmTelefono" oninput="actualizarPreviewPagoMovil()" required placeholder="0412-1737330" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Cédula / RIF *</label>
+                    <input type="text" id="pmCedula" oninput="actualizarPreviewPagoMovil()" required placeholder="V-25.000.000" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+                  </div>
+                </div>
+
+                <div>
+                  <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Titular (Opcional)</label>
+                  <input type="text" id="pmTitular" oninput="actualizarPreviewPagoMovil()" placeholder="Ej. Pachon's Bakehouse" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+                </div>
+
+                <label class="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-cream-50 border border-cream-200 cursor-pointer">
+                  <div>
+                    <span class="block text-xs font-bold text-cocoa-950">Incluir automáticamente en mensajes de cobro por WhatsApp</span>
+                    <span class="block text-[11px] text-cocoa-700/80">Anexa tus datos bancarios al final de cada recordatorio</span>
+                  </div>
+                  <div class="relative inline-flex items-center shrink-0">
+                    <input type="checkbox" id="pmIncluirEnMensaje" onchange="actualizarPreviewPagoMovil()" class="sr-only peer" checked />
+                    <div class="w-11 h-6 bg-cream-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-whatsapp-500"></div>
+                  </div>
+                </label>
+
+                <button type="submit" class="w-full py-3 rounded-xl bg-cocoa-900 hover:bg-cocoa-800 text-cream-50 font-semibold text-sm shadow-2xs transition active:scale-95">
+                  Guardar Datos de Pago Móvil
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- Vista Previa en Vivo del Bloque de WhatsApp -->
+          <div class="lg:col-span-5">
+            <div class="bg-white rounded-2xl p-5 shadow-2xs border border-cream-200 space-y-3">
+              <div class="flex items-center justify-between">
+                <h3 class="font-serif text-base font-bold text-cocoa-950">Vista Previa en WhatsApp</h3>
+                <button type="button" onclick="copiarDatosPagoMovil()" class="text-xs font-bold text-caramel-600 hover:underline">
+                  Copiar texto
+                </button>
+              </div>
+              <p class="text-xs text-cocoa-700">Así se verá el bloque al final de tus mensajes de cobro:</p>
+
+              <div class="bg-[#E7FFDB] border border-emerald-200 rounded-2xl p-4 text-xs text-gray-800 font-sans whitespace-pre-line leading-relaxed shadow-inner" id="previewBloqueWhatsApp">
+                📲 *Datos Pago Móvil:*
+                • Banco: Banesco (0134)
+                • Teléfono: (Sin configurar)
+                • Cédula/RIF: (Sin configurar)
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ===================================================================
+           VISTA 4: RESPALDO / EXCEL (VISTA DEDICADA)
+           =================================================================== -->
+      <section id="view-respaldo" class="hidden space-y-5 anim-in">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <!-- Copia de Seguridad JSON -->
+          <div class="bg-white rounded-2xl p-5 shadow-2xs border border-cream-200 space-y-4 flex flex-col justify-between">
+            <div class="space-y-2">
+              <span class="inline-block px-2.5 py-1 rounded-lg bg-cocoa-900 text-cream-50 text-xs font-bold">JSON Completo</span>
+              <h3 class="font-serif text-base font-bold text-cocoa-950">Copia de Seguridad Total</h3>
+              <p class="text-xs text-cocoa-700 leading-relaxed">
+                Descarga o restaura un respaldo completo con todos tus clientes, historial de ventas y abonos, catálogo de dulces, datos de Pago Móvil y tasa BCV.
+              </p>
+            </div>
+
+            <div class="flex flex-col sm:flex-row gap-2.5 pt-2">
+              <button type="button" onclick="exportarJSON()" class="flex-1 py-3 px-4 rounded-xl bg-cocoa-900 hover:bg-cocoa-800 text-cream-50 text-xs font-semibold transition active:scale-95">
+                ⬇️ Exportar Respaldo JSON
+              </button>
+              <label class="flex-1 py-3 px-4 rounded-xl bg-cream-200 hover:bg-cream-300 text-cocoa-950 text-xs font-semibold text-center cursor-pointer transition active:scale-95">
+                ⬆️ Importar JSON
+                <input type="file" accept=".json" onchange="importarJSON(event)" class="hidden" />
+              </label>
+            </div>
+          </div>
+
+          <!-- Importar CSV desde Excel -->
+          <div class="bg-white rounded-2xl p-5 shadow-2xs border border-cream-200 space-y-4 flex flex-col justify-between">
+            <div class="space-y-2">
+              <span class="inline-block px-2.5 py-1 rounded-lg bg-caramel-500 text-white text-xs font-bold">Excel / CSV</span>
+              <h3 class="font-serif text-base font-bold text-cocoa-950">Importar Deudas desde Excel</h3>
+              <p class="text-xs text-cocoa-700 leading-relaxed">
+                Guarda tu hoja de Excel como <strong>CSV (delimitado por comas o punto y coma)</strong> con las siguientes 3 columnas en orden:
+              </p>
+              <div class="bg-cream-50 border border-cream-200 rounded-xl p-2.5 text-xs font-mono text-cocoa-900">
+                Nombre, Telefono, Deuda
+              </div>
+            </div>
+
+            <div class="pt-2">
+              <label class="block w-full py-3 px-4 rounded-xl bg-caramel-500 hover:bg-caramel-600 text-white text-xs font-semibold text-center cursor-pointer shadow-2xs transition active:scale-95">
+                📄 Seleccionar archivo .CSV
+                <input type="file" accept=".csv,text/csv" onchange="importarCSV(event)" class="hidden" />
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Herramientas de Prueba y Limpieza -->
+        <div class="bg-white rounded-2xl p-5 shadow-2xs border border-cream-200 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h4 class="text-sm font-bold text-cocoa-950">Opciones Rápidas de Base de Datos</h4>
+            <p class="text-xs text-cocoa-700">Agrega un cliente de demostración o reinicia los registros locales.</p>
+          </div>
+          <div class="flex flex-wrap gap-2.5">
+            <button type="button" onclick="cargarDatosEjemplo()" class="px-4 py-2.5 rounded-xl bg-cream-100 hover:bg-cream-200 text-cocoa-900 font-semibold text-xs transition">
+              + Cargar Cliente de Ejemplo
+            </button>
+            <button type="button" onclick="confirmarLimpiarTodo()" class="px-4 py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-semibold text-xs transition">
+              🗑️ Borrar Todos los Datos
+            </button>
+          </div>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- CONTENEDOR DE NOTIFICACIONES FLOTANTES (TOASTS) -->
+  <div id="toastContainer" class="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 pointer-events-none flex flex-col items-center gap-2 w-full max-w-sm px-4"></div>
+
+  <!-- =====================================================================
+       MODAL 1: NUEVO / EDITAR CLIENTE
+       ===================================================================== -->
+  <div id="modalCliente" class="fixed inset-0 z-50 hidden bg-cocoa-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-cream-200 overflow-hidden anim-in">
+      <div class="bg-cocoa-900 text-cream-50 px-5 py-4 flex items-center justify-between">
+        <h2 id="tituloModalCliente" class="font-serif text-lg font-bold">Nuevo Cliente</h2>
+        <button type="button" onclick="cerrarModal('modalCliente')" class="text-cream-200 hover:text-white p-1.5 rounded-lg font-bold">✕</button>
+      </div>
+
+      <form id="formCliente" onsubmit="guardarCliente(event)" class="p-5 space-y-4">
+        <input type="hidden" id="clienteId" />
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Nombre del Cliente *</label>
+          <input type="text" id="clienteNombre" required placeholder="Ej. María Fernanda Pérez" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">WhatsApp / Teléfono *</label>
+          <div class="relative">
+            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-cocoa-800 bg-cream-200 px-2 py-0.5 rounded">+58</span>
+            <input type="tel" id="clienteTelefono" required placeholder="0412 1234567" class="w-full pl-14 pr-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+          </div>
+          <p class="text-[11px] text-cocoa-700/75 mt-1">Si empieza por 0 (ej. 0412...), se formatea solo a 58412...</p>
+        </div>
+
+        <div id="grupoDeudaInicial">
+          <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Deuda Inicial en USD (Opcional)</label>
+          <input type="number" id="clienteDeudaInicial" step="0.01" min="0" placeholder="0.00" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Nota o Referencia (Opcional)</label>
+          <input type="text" id="clienteNota" placeholder="Ej. Oficina piso 3 / Vecina" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+        </div>
+
+        <div class="pt-2 flex gap-2.5">
+          <button type="button" onclick="cerrarModal('modalCliente')" class="flex-1 py-3 rounded-xl bg-cream-100 hover:bg-cream-200 text-cocoa-900 font-semibold text-sm transition">Cancelar</button>
+          <button type="submit" class="flex-1 py-3 rounded-xl bg-cocoa-900 hover:bg-cocoa-800 text-cream-50 font-semibold text-sm shadow transition">Guardar Cliente</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 2: ANOTAR VENTA / FIADO
+       ===================================================================== -->
+  <div id="modalVenta" class="fixed inset-0 z-50 hidden bg-cocoa-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-cream-200 overflow-hidden anim-in max-h-[92vh] flex flex-col">
+      <div class="bg-caramel-500 text-white px-5 py-4 flex items-center justify-between shrink-0">
+        <h2 class="font-serif text-lg font-bold">Anotar Venta / Fiado</h2>
+        <button type="button" onclick="cerrarModal('modalVenta')" class="text-white/90 hover:text-white p-1.5 rounded-lg font-bold">✕</button>
+      </div>
+
+      <form id="formVenta" onsubmit="guardarVenta(event)" class="p-5 space-y-4 overflow-y-auto">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Cliente *</label>
+          <select id="ventaClienteId" required class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-caramel-500"></select>
+        </div>
+
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800">Catálogo Rápido</label>
+            <button type="button" onclick="cerrarModal('modalVenta'); cambiarVista('catalogo');" class="text-[11px] font-bold text-caramel-600 hover:underline">
+              Gestionar catálogo →
+            </button>
+          </div>
+          <div class="flex flex-wrap gap-1.5" id="productosRapidosContainer"></div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Descripción del Pedido *</label>
+          <input type="text" id="ventaDescripcion" required placeholder="Ej. 2x Galleta Choco Chip 30g + 1x Brownie" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Monto Total ($) *</label>
+            <input type="number" id="ventaMonto" oninput="actualizarVistaPreviaVentaBs()" step="0.01" min="0.01" required placeholder="0.00" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-bold text-cocoa-950 focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+            <p id="textoVentaBs" class="text-[11px] font-semibold text-caramel-600 mt-1">Equivale a: Bs. 0,00</p>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Fecha *</label>
+            <input type="date" id="ventaFecha" required class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-caramel-500" />
+          </div>
+        </div>
+
+        <div class="pt-2 flex gap-2.5">
+          <button type="button" onclick="cerrarModal('modalVenta')" class="flex-1 py-3 rounded-xl bg-cream-100 hover:bg-cream-200 text-cocoa-900 font-semibold text-sm transition">Cancelar</button>
+          <button type="submit" class="flex-1 py-3 rounded-xl bg-caramel-500 hover:bg-caramel-600 text-white font-semibold text-sm shadow transition">Guardar Venta</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 3: REGISTRAR ABONO / PAGO (CON TOGGLE USD VS BS.)
+       ===================================================================== -->
+  <div id="modalAbono" class="fixed inset-0 z-50 hidden bg-cocoa-950/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white w-full sm:max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl border border-cream-200 overflow-hidden anim-in">
+      <div class="bg-emerald-600 text-white px-5 py-4 flex items-center justify-between">
+        <h2 class="font-serif text-lg font-bold">Registrar Abono / Pago</h2>
+        <button type="button" onclick="cerrarModal('modalAbono')" class="text-white/90 hover:text-white p-1.5 rounded-lg font-bold">✕</button>
+      </div>
+
+      <form id="formAbono" onsubmit="guardarAbono(event)" class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Cliente *</label>
+          <select id="abonoClienteId" onchange="actualizarInfoDeudaAbono()" required class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500"></select>
+          <div class="mt-1.5 text-xs font-medium text-cocoa-700 flex items-center justify-between bg-cream-100 px-3 py-2 rounded-xl">
+            <span>Deuda actual: <strong id="textoDeudaAbono" class="text-cocoa-950">$0.00</strong></span>
+            <button type="button" onclick="saldarTotalAbono()" class="text-emerald-700 hover:underline font-bold">Saldar todo</button>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label id="labelMontoAbono" class="block text-xs font-bold uppercase tracking-wider text-cocoa-800">Abono ($) *</label>
+              <div class="inline-flex rounded-lg bg-cream-200 p-0.5 text-[10px] font-bold">
+                <button type="button" id="btnMonedaUSD" onclick="cambiarMonedaAbono('USD')" class="px-2 py-0.5 rounded-md bg-emerald-600 text-white transition">USD</button>
+                <button type="button" id="btnMonedaBS" onclick="cambiarMonedaAbono('BS')" class="px-2 py-0.5 rounded-md text-cocoa-800 transition">Bs.</button>
+              </div>
+            </div>
+            <input type="number" id="abonoMonto" oninput="actualizarConversionAbono()" step="0.01" min="0.01" required placeholder="0.00" class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm font-bold text-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+            <p id="textoConversionAbono" class="text-[11px] font-semibold text-cocoa-700/80 mt-1">Equivale a: Bs. 0,00</p>
+          </div>
+
+          <div>
+            <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Fecha *</label>
+            <input type="date" id="abonoFecha" required class="w-full px-3.5 py-2.5 bg-cream-50 border border-cream-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase tracking-wider text-cocoa-800 mb-1.5">Método de Pago</label>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            <label class="cursor-pointer">
+              <input type="radio" name="metodoPago" value="Pago Móvil" checked class="peer sr-only" />
+              <div class="text-center py-2 px-2 rounded-xl border border-cream-300 bg-cream-50 text-xs font-semibold text-cocoa-800 peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:border-emerald-600 transition">Pago Móvil</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="metodoPago" value="Efectivo $" class="peer sr-only" />
+              <div class="text-center py-2 px-2 rounded-xl border border-cream-300 bg-cream-50 text-xs font-semibold text-cocoa-800 peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:border-emerald-600 transition">Efectivo $</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="metodoPago" value="Zelle" class="peer sr-only" />
+              <div class="text-center py-2 px-2 rounded-xl border border-cream-300 bg-cream-50 text-xs font-semibold text-cocoa-800 peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:border-emerald-600 transition">Zelle</div>
+            </label>
+            <label class="cursor-pointer">
+              <input type="radio" name="metodoPago" value="Binance" class="peer sr-only" />
+              <div class="text-center py-2 px-2 rounded-xl border border-cream-300 bg-cream-50 text-xs font-semibold text-cocoa-800 peer-checked:bg-emerald-600 peer-checked:text-white peer-checked:border-emerald-600 transition">Binance</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="pt-2 flex gap-2.5">
+          <button type="button" onclick="cerrarModal('modalAbono')" class="flex-1 py-3 rounded-xl bg-cream-100 hover:bg-cream-200 text-cocoa-900 font-semibold text-sm transition">Cancelar</button>
+          <button type="submit" class="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm shadow transition">Guardar Abono</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       MODAL 4: CONFIRMACIÓN SEGURA (SIN confirm() NATIVO)
+       ===================================================================== -->
+  <div id="modalConfirmar" class="fixed inset-0 z-50 hidden bg-cocoa-950/70 backdrop-blur-xs flex items-center justify-center p-4">
+    <div class="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-cream-200 p-5 space-y-4 anim-in">
+      <div>
+        <h3 id="confirmTitulo" class="font-bold text-base text-cocoa-950">¿Confirmar acción?</h3>
+        <p id="confirmMensaje" class="text-xs text-cocoa-700 mt-1">Esta acción no se puede deshacer.</p>
+      </div>
+      <div class="flex gap-2.5 pt-1">
+        <button type="button" onclick="cerrarModal('modalConfirmar')" class="flex-1 py-2.5 rounded-xl bg-cream-100 hover:bg-cream-200 text-cocoa-900 font-semibold text-xs transition">Cancelar</button>
+        <button type="button" id="btnConfirmarAccion" class="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-semibold text-xs shadow transition">Sí, continuar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- =====================================================================
+       JAVASCRIPT 100% AUTOCONTENIDO (VANILLA JS)
+       ===================================================================== -->
+  <script>
+    // ---------------------------------------------------------------------
+    // 1. MANIFEST PWA INLINE Y BOTÓN DE INSTALACIÓN
+    // ---------------------------------------------------------------------
+    (function setupPWA() {
+      try {
+        const svgIcon = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" rx="110" fill="#3E2723"/><circle cx="256" cy="256" r="165" fill="#C87D28"/><circle cx="200" cy="200" r="22" fill="#3E2723"/><circle cx="310" cy="190" r="18" fill="#3E2723"/><circle cx="240" cy="295" r="24" fill="#3E2723"/></svg>';
+        const iconUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgIcon);
+        const manifest = {
+          name: "Pachon's Bakehouse — Control de Deudas",
+          short_name: "Pachon's",
+          start_url: ".",
+          display: "standalone",
+          background_color: "#F8F2E8",
+          theme_color: "#3E2723",
+          icons: [
+            { src: iconUrl, sizes: "192x192", type: "image/svg+xml" },
+            { src: iconUrl, sizes: "512x512", type: "image/svg+xml" }
+          ]
+        };
+        const link = document.createElement('link');
+        link.rel = 'manifest';
+        link.href = 'data:application/manifest+json;charset=utf-8,' + encodeURIComponent(JSON.stringify(manifest));
+        document.head.appendChild(link);
+      } catch (e) {}
+
+      try {
+        if ('serviceWorker' in navigator && window.location.protocol === 'https:') {
+          const swCode = "self.addEventListener('install',e=>self.skipWaiting());self.addEventListener('activate',e=>e.waitUntil(clients.claim()));";
+          const blob = new Blob([swCode], { type: 'application/javascript' });
+          navigator.serviceWorker.register(URL.createObjectURL(blob)).catch(function () {});
+        }
+      } catch (e) {}
+    })();
+
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      deferredPrompt = e;
+      const btn = document.getElementById('btnInstallPWA');
+      if (btn) {
+        btn.classList.remove('hidden');
+        btn.classList.add('flex');
+      }
+    });
+
+    function instalarPWA() {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      deferredPrompt.userChoice.then(function (res) {
+        if (res.outcome === 'accepted') {
+          mostrarToast('¡App instalada en tu pantalla de inicio!');
+        }
+        deferredPrompt = null;
+        document.getElementById('btnInstallPWA').classList.add('hidden');
+      });
+    }
+
+    // ---------------------------------------------------------------------
+    // 2. ESTADO GLOBAL Y PERSISTENCIA DEFENSIVA EN LOCALSTORAGE
+    // ---------------------------------------------------------------------
+    const STORAGE_KEY = 'pachons_bakehouse_data_v3';
+    const BCV_STORAGE_KEY = 'pachons_bcv_config_v3';
+    const PM_STORAGE_KEY = 'pachons_pagomovil_v3';
+    const CATALOG_STORAGE_KEY = 'pachons_catalog_v3';
+
+    const CATALOGO_PREDETERMINADO = [
+      { nombre: 'Galleta Choco Chip 30g', precio: 1.50 },
+      { nombre: 'Galleta Doble Chocolate 30g', precio: 1.50 },
+      { nombre: 'Brownie Fudge 7x7', precio: 2.50 },
+      { nombre: 'Brownie Bites (x4)', precio: 3.00 },
+      { nombre: 'Porción Ponqué', precio: 2.00 },
+      { nombre: 'Helado Ninja Creami', precio: 3.50 }
+    ];
+
+    let appData = { clientes: [] };
+    let catalogoProductos = [];
+    let bcvConfig = { tasa: 0, actualizado: '' };
+    let pagoMovilConfig = {
+      banco: 'Banesco (0134)',
+      bancoOtro: '',
+      telefono: '',
+      cedula: '',
+      titular: "Pachon's Bakehouse",
+      incluirEnMensaje: true
+    };
+
+    let vistaActual = 'cuentas';
+    let filtroActual = 'todos';
+    let monedaAbonoActual = 'USD';
+    let clientesExpandidos = new Set();
+
+    function cargarDatos() {
+      try {
+        const rawData = localStorage.getItem(STORAGE_KEY);
+        if (rawData) {
+          const parsed = JSON.parse(rawData);
+          if (parsed && Array.isArray(parsed.clientes)) {
+            appData = parsed;
+          }
+        }
+      } catch (e) {
+        appData = { clientes: [] };
+      }
+
+      try {
+        const rawBcv = localStorage.getItem(BCV_STORAGE_KEY);
+        if (rawBcv) {
+          const parsedBcv = JSON.parse(rawBcv);
+          if (parsedBcv && typeof parsedBcv === 'object') {
+            bcvConfig = Object.assign({}, bcvConfig, parsedBcv);
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const rawPm = localStorage.getItem(PM_STORAGE_KEY);
+        if (rawPm) {
+          const parsedPm = JSON.parse(rawPm);
+          if (parsedPm && typeof parsedPm === 'object') {
+            pagoMovilConfig = Object.assign({}, pagoMovilConfig, parsedPm);
+          }
+        }
+      } catch (e) {}
+
+      try {
+        const rawCat = localStorage.getItem(CATALOG_STORAGE_KEY);
+        if (rawCat) {
+          const parsedCat = JSON.parse(rawCat);
+          catalogoProductos = Array.isArray(parsedCat) ? parsedCat : clonarCatalogoBase();
+        } else {
+          catalogoProductos = clonarCatalogoBase();
+          guardarCatalogo();
+        }
+      } catch (e) {
+        catalogoProductos = clonarCatalogoBase();
+      }
+
+      renderizarWidgetBCV();
+      cargarFormularioPagoMovil();
+      actualizarBadgePagoMovil();
+    }
+
+    function clonarCatalogoBase() {
+      return CATALOGO_PREDETERMINADO.map(function (item) {
+        return { nombre: item.nombre, precio: item.precio };
+      });
+    }
+
+    function guardarDatos() {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(appData)); } catch (e) {}
+    }
+
+    function guardarConfigBCV() {
+      try { localStorage.setItem(BCV_STORAGE_KEY, JSON.stringify(bcvConfig)); } catch (e) {}
+    }
+
+    function guardarConfigPagoMovil() {
+      try { localStorage.setItem(PM_STORAGE_KEY, JSON.stringify(pagoMovilConfig)); } catch (e) {}
+    }
+
+    function guardarCatalogo() {
+      try { localStorage.setItem(CATALOG_STORAGE_KEY, JSON.stringify(catalogoProductos)); } catch (e) {}
+    }
+
+    // ---------------------------------------------------------------------
+    // 3. NAVEGACIÓN DE BARRA LATERAL Y CAMBIO DE VISTAS
+    // ---------------------------------------------------------------------
+    function abrirSidebar() {
+      document.getElementById('appSidebar').classList.remove('-translate-x-full');
+      document.getElementById('sidebarOverlay').classList.remove('hidden');
+    }
+
+    function cerrarSidebar() {
+      document.getElementById('appSidebar').classList.add('-translate-x-full');
+      document.getElementById('sidebarOverlay').classList.add('hidden');
+    }
+
+    function cambiarVista(vista) {
+      vistaActual = vista;
+      const vistas = ['cuentas', 'catalogo', 'pagomovil', 'respaldo'];
+      const titulos = {
+        cuentas: ['📋 Cuentas y Cobros', 'Gestiona fiados, abonos y recordatorios por WhatsApp'],
+        catalogo: ['🍪 Catálogo de Dulces', 'Administra precios y productos de Pachon\'s Bakehouse'],
+        pagomovil: ['📲 Datos Pago Móvil', 'Configura tus datos bancarios para anexar en los cobros'],
+        respaldo: ['💾 Respaldo / Excel', 'Exporta copias de seguridad o importa clientes desde CSV']
+      };
+
+      vistas.forEach(function (v) {
+        const elView = document.getElementById('view-' + v);
+        const elNav = document.getElementById('nav-' + v);
+        if (v === vista) {
+          elView.classList.remove('hidden');
+          elNav.classList.add('bg-caramel-500', 'text-white', 'shadow-sm');
+          elNav.classList.remove('text-cream-200', 'hover:bg-cocoa-800');
+        } else {
+          elView.classList.add('hidden');
+          elNav.classList.remove('bg-caramel-500', 'text-white', 'shadow-sm');
+          elNav.classList.add('text-cream-200', 'hover:bg-cocoa-800');
+        }
+      });
+
+      document.getElementById('headerViewTitle').textContent = titulos[vista][0];
+      document.getElementById('headerViewSubtitle').textContent = titulos[vista][1];
+
+      if (vista === 'cuentas') renderizarClientes();
+      if (vista === 'catalogo') {
+        cancelarEdicionCatalogo();
+        renderizarListaCatalogo();
+      }
+      if (vista === 'pagomovil') {
+        cargarFormularioPagoMovil();
+        actualizarPreviewPagoMovil();
+      }
+
+      cerrarSidebar();
+    }
+
+    // ---------------------------------------------------------------------
+    // 4. UTILIDADES DE FORMATO Y TELÉFONO VENEZUELA
+    // ---------------------------------------------------------------------
+    function formatearMoneda(valor) {
+      const num = Number(valor) || 0;
+      return '$' + num.toFixed(2);
+    }
+
+    function formatearBolivares(valorBs) {
+      const num = Number(valorBs) || 0;
+      return 'Bs. ' + num.toLocaleString('es-VE', {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+      });
+    }
+
+    function convertirUSDaBs(montoUSD) {
+      const tasa = Number(bcvConfig.tasa) || 0;
+      if (tasa <= 0) return 0;
+      return (Number(montoUSD) || 0) * tasa;
+    }
+
+    function normalizarTelefonoVE(tel) {
+      let limpio = String(tel || '').replace(/\D/g, '');
+      if (!limpio) return '';
+      if (limpio.startsWith('0')) {
+        limpio = '58' + limpio.substring(1);
+      } else if (limpio.length === 10 && limpio.startsWith('4')) {
+        limpio = '58' + limpio;
+      }
+      return limpio;
+    }
+
+    function mostrarTelefonoBonito(tel58) {
+      if (!tel58) return '';
+      if (tel58.startsWith('58') && tel58.length === 12) {
+        return '+58 ' + tel58.slice(2, 5) + '-' + tel58.slice(5);
+      }
+      return '+' + tel58;
+    }
+
+    function obtenerFechaHoy() {
+      const hoy = new Date();
+      const yyyy = hoy.getFullYear();
+      const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+      const dd = String(hoy.getDate()).padStart(2, '0');
+      return yyyy + '-' + mm + '-' + dd;
+    }
+
+    function formatearFechaCorta(fechaISO) {
+      if (!fechaISO) return '';
+      const partes = fechaISO.split('-');
+      if (partes.length !== 3) return fechaISO;
+      return partes[2] + '/' + partes[1] + '/' + partes[0].slice(2);
+    }
+
+    function escaparHTML(texto) {
+      return String(texto || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function mostrarToast(mensaje, tipo) {
+      const cont = document.getElementById('toastContainer');
+      const div = document.createElement('div');
+      const bg = tipo === 'error' ? 'bg-rose-700' : 'bg-cocoa-900';
+      div.className = bg + ' text-cream-50 px-4 py-2.5 rounded-2xl shadow-xl text-xs font-semibold border border-white/10 anim-in text-center';
+      div.textContent = mensaje;
+      cont.appendChild(div);
+      setTimeout(function () {
+        div.style.opacity = '0';
+        div.style.transition = 'opacity 0.25s ease';
+        setTimeout(function () { div.remove(); }, 250);
+      }, 2600);
+    }
+
+    // ---------------------------------------------------------------------
+    // 5. SINCRONIZACIÓN Y GESTIÓN DE TASA BCV
+    // ---------------------------------------------------------------------
+    function renderizarWidgetBCV() {
+      const input = document.getElementById('inputTasaBCV');
+      const texto = document.getElementById('textoUltimaActBCV');
+      if (bcvConfig.tasa > 0) {
+        input.value = Number(bcvConfig.tasa).toFixed(2);
+      }
+      if (bcvConfig.actualizado) {
+        texto.textContent = bcvConfig.actualizado;
+      }
+    }
+
+    function actualizarTasaManual(valor) {
+      const num = parseFloat(valor);
+      bcvConfig.tasa = (!isNaN(num) && num > 0) ? num : 0;
+      const ahora = new Date();
+      bcvConfig.actualizado = 'Manual ' + ahora.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+      document.getElementById('textoUltimaActBCV').textContent = bcvConfig.actualizado;
+      guardarConfigBCV();
+      renderizarClientes();
+      if (vistaActual === 'catalogo') {
+        renderizarListaCatalogo();
+        actualizarPreviewPrecioCatalogo();
+      }
+    }
+
+    async function sincronizarTasaBCV(silencioso) {
+      const icono = document.getElementById('iconoSyncBCV');
+      const btn = document.getElementById('btnSincronizarBCV');
+      if (icono) icono.classList.add('animate-spin');
+      if (btn) btn.disabled = true;
+
+      let tasaObtenida = null;
+
+      try {
+        const res1 = await fetch('https://ve.dolarapi.com/v1/dolares/oficial', { cache: 'no-store' });
+        if (res1.ok) {
+          const d1 = await res1.json();
+          if (d1 && d1.promedio && Number(d1.promedio) > 0) {
+            tasaObtenida = Number(d1.promedio);
+          }
+        }
+      } catch (e1) {}
+
+      if (!tasaObtenida) {
+        try {
+          const res2 = await fetch('https://pydolarve.org/api/v1/dollar?page=bcv', { cache: 'no-store' });
+          if (res2.ok) {
+            const d2 = await res2.json();
+            const price = d2 && d2.monitors && d2.monitors.usd && d2.monitors.usd.price;
+            if (price && Number(price) > 0) {
+              tasaObtenida = Number(price);
+            }
+          }
+        } catch (e2) {}
+      }
+
+      if (icono) icono.classList.remove('animate-spin');
+      if (btn) btn.disabled = false;
+
+      if (tasaObtenida && tasaObtenida > 0) {
+        bcvConfig.tasa = Math.round(tasaObtenida * 100) / 100;
+        const ahora = new Date();
+        bcvConfig.actualizado = 'BCV ' + ahora.toLocaleTimeString('es-VE', { hour: '2-digit', minute: '2-digit' });
+        guardarConfigBCV();
+        renderizarWidgetBCV();
+        renderizarClientes();
+        if (vistaActual === 'catalogo') {
+          renderizarListaCatalogo();
+          actualizarPreviewPrecioCatalogo();
+        }
+        if (!silencioso) {
+          mostrarToast('Tasa BCV actualizada: ' + formatearBolivares(bcvConfig.tasa));
+        }
+      } else if (!silencioso) {
+        mostrarToast('No se pudo consultar la API. Ingresa la tasa manualmente.', 'error');
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // 6. DATOS DE PAGO MÓVIL Y BLOQUE WHATSAPP
+    // ---------------------------------------------------------------------
+    function toggleBancoOtro() {
+      const sel = document.getElementById('pmBanco').value;
+      const inputOtro = document.getElementById('pmBancoOtro');
+      if (sel === 'Otro') {
+        inputOtro.classList.remove('hidden');
+      } else {
+        inputOtro.classList.add('hidden');
+      }
+    }
+
+    function cargarFormularioPagoMovil() {
+      const sel = document.getElementById('pmBanco');
+      const opciones = Array.from(sel.options).map(function (o) { return o.value; });
+      if (opciones.includes(pagoMovilConfig.banco)) {
+        sel.value = pagoMovilConfig.banco;
+        document.getElementById('pmBancoOtro').classList.add('hidden');
+      } else {
+        sel.value = 'Otro';
+        document.getElementById('pmBancoOtro').classList.remove('hidden');
+        document.getElementById('pmBancoOtro').value = pagoMovilConfig.bancoOtro || pagoMovilConfig.banco || '';
+      }
+
+      document.getElementById('pmTelefono').value = pagoMovilConfig.telefono || '';
+      document.getElementById('pmCedula').value = pagoMovilConfig.cedula || '';
+      document.getElementById('pmTitular').value = pagoMovilConfig.titular || '';
+      document.getElementById('pmIncluirEnMensaje').checked = pagoMovilConfig.incluirEnMensaje !== false;
+      actualizarPreviewPagoMovil();
+    }
+
+    function obtenerDatosPagoMovilDesdeForm() {
+      const bancoSel = document.getElementById('pmBanco').value;
+      const bancoOtro = document.getElementById('pmBancoOtro').value.trim();
+      return {
+        banco: bancoSel === 'Otro' ? (bancoOtro || 'Banco') : bancoSel,
+        telefono: document.getElementById('pmTelefono').value.trim(),
+        cedula: document.getElementById('pmCedula').value.trim(),
+        titular: document.getElementById('pmTitular').value.trim(),
+        incluirEnMensaje: document.getElementById('pmIncluirEnMensaje').checked
+      };
+    }
+
+    function actualizarPreviewPagoMovil() {
+      const datos = obtenerDatosPagoMovilDesdeForm();
+      const box = document.getElementById('previewBloqueWhatsApp');
+      if (!box) return;
+
+      let texto = '📲 *Datos Pago Móvil:*\n';
+      texto += '• Banco: ' + (datos.banco || 'Banesco (0134)') + '\n';
+      texto += '• Teléfono: ' + (datos.telefono || '0412-0000000') + '\n';
+      texto += '• Cédula/RIF: ' + (datos.cedula || 'V-00.000.000');
+      if (datos.titular) {
+        texto += '\n• Titular: ' + datos.titular;
+      }
+      if (!datos.incluirEnMensaje) {
+        texto += '\n\n⚠️ (Desactivado: no se anexará automáticamente)';
+      }
+      box.textContent = texto;
+    }
+
+    function guardarPagoMovil(e) {
+      e.preventDefault();
+      const datos = obtenerDatosPagoMovilDesdeForm();
+      if (!datos.telefono || !datos.cedula) {
+        mostrarToast('Completa teléfono y cédula/RIF', 'error');
+        return;
+      }
+
+      pagoMovilConfig = {
+        banco: document.getElementById('pmBanco').value === 'Otro' ? 'Otro' : datos.banco,
+        bancoOtro: document.getElementById('pmBancoOtro').value.trim(),
+        telefono: datos.telefono,
+        cedula: datos.cedula,
+        titular: datos.titular,
+        incluirEnMensaje: datos.incluirEnMensaje
+      };
+
+      guardarConfigPagoMovil();
+      actualizarBadgePagoMovil();
+      actualizarPreviewPagoMovil();
+      mostrarToast('Datos de Pago Móvil guardados');
+    }
+
+    function actualizarBadgePagoMovil() {
+      const badge = document.getElementById('sidebarBadgePM');
+      const resumen = document.getElementById('sidebarResumenPM');
+      const tieneDatos = Boolean(pagoMovilConfig.telefono && pagoMovilConfig.cedula);
+
+      if (tieneDatos && pagoMovilConfig.incluirEnMensaje) {
+        badge.textContent = 'Activo ✓';
+        badge.className = 'font-bold text-emerald-400';
+        const bancoNombre = pagoMovilConfig.banco === 'Otro' ? pagoMovilConfig.bancoOtro : pagoMovilConfig.banco;
+        resumen.textContent = bancoNombre + ' • ' + pagoMovilConfig.telefono;
+      } else if (tieneDatos) {
+        badge.textContent = 'Pausado';
+        badge.className = 'font-bold text-cream-300';
+        resumen.textContent = 'Guardado, pero desactivado en mensajes';
+      } else {
+        badge.textContent = 'Sin datos';
+        badge.className = 'font-bold text-amber-400';
+        resumen.textContent = 'Configúralo en Datos Pago Móvil';
+      }
+    }
+
+    function construirBloquePagoMovilWhatsApp() {
+      if (!pagoMovilConfig.incluirEnMensaje) return '';
+      if (!pagoMovilConfig.telefono || !pagoMovilConfig.cedula) return '';
+      const bancoNombre = pagoMovilConfig.banco === 'Otro'
+        ? (pagoMovilConfig.bancoOtro || 'Banco')
+        : pagoMovilConfig.banco;
+
+      let bloque = '\n\n📲 *Datos Pago Móvil:*\n';
+      bloque += '• Banco: ' + bancoNombre + '\n';
+      bloque += '• Teléfono: ' + pagoMovilConfig.telefono + '\n';
+      bloque += '• Cédula/RIF: ' + pagoMovilConfig.cedula;
+      if (pagoMovilConfig.titular) {
+        bloque += '\n• Titular: ' + pagoMovilConfig.titular;
+      }
+      return bloque;
+    }
+
+    function copiarDatosPagoMovil() {
+      const texto = document.getElementById('previewBloqueWhatsApp').textContent;
+      const ta = document.createElement('textarea');
+      ta.value = texto;
+      document.body.appendChild(ta);
+      ta.select();
+      try {
+        document.execCommand('copy');
+        mostrarToast('Datos de Pago Móvil copiados');
+      } catch (e) {
+        mostrarToast('No se pudo copiar', 'error');
+      }
+      ta.remove();
+    }
+
+    // ---------------------------------------------------------------------
+    // 7. GESTOR DE CATÁLOGO DE DULCES (VISTA DEDICADA)
+    // ---------------------------------------------------------------------
+    function actualizarPreviewPrecioCatalogo() {
+      const precio = parseFloat(document.getElementById('catalogoPrecio').value) || 0;
+      const el = document.getElementById('previewPrecioCatalogoBs');
+      el.textContent = bcvConfig.tasa > 0
+        ? 'Equivale a: ' + formatearBolivares(convertirUSDaBs(precio))
+        : 'Sin tasa BCV configurada';
+    }
+
+    function renderizarListaCatalogo() {
+      const lista = document.getElementById('listaProductosCatalogo');
+      const contador = document.getElementById('contadorCatalogo');
+      contador.textContent = catalogoProductos.length;
+
+      if (catalogoProductos.length === 0) {
+        lista.innerHTML = '<div class="p-6 rounded-2xl bg-cream-50 border border-cream-200 text-center text-xs text-cocoa-700">Tu catálogo está vacío. Agrega un dulce en el formulario o restaura los predeterminados.</div>';
+        return;
+      }
+
+      lista.innerHTML = catalogoProductos.map(function (prod, idx) {
+        const precioNum = Number(prod.precio) || 0;
+        const textoBs = bcvConfig.tasa > 0
+          ? ' • <span class="text-caramel-600 font-semibold">' + formatearBolivares(convertirUSDaBs(precioNum)) + '</span>'
+          : '';
+
+        return (
+          '<div class="flex items-center justify-between gap-3 p-3.5 rounded-2xl bg-cream-50 border border-cream-200 hover:border-cream-300 transition">' +
+            '<div class="min-w-0">' +
+              '<p class="text-sm font-bold text-cocoa-950 truncate">' + escaparHTML(prod.nombre) + '</p>' +
+              '<p class="text-xs font-bold text-emerald-700 mt-0.5">' + formatearMoneda(precioNum) + textoBs + '</p>' +
+            '</div>' +
+            '<div class="flex items-center gap-1.5 shrink-0">' +
+              '<button type="button" onclick="editarProductoCatalogo(' + idx + ')" class="px-3 py-1.5 rounded-xl bg-white hover:bg-cream-200 border border-cream-300 text-cocoa-900 text-xs font-semibold transition">Editar</button>' +
+              '<button type="button" onclick="confirmarEliminarProductoCatalogo(' + idx + ')" class="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs font-semibold transition">Eliminar</button>' +
+            '</div>' +
+          '</div>'
+        );
+      }).join('');
+    }
+
+    function guardarProductoCatalogo(e) {
+      e.preventDefault();
+      const editIdx = parseInt(document.getElementById('catalogoEditIndex').value, 10);
+      const nombre = document.getElementById('catalogoNombre').value.trim();
+      const precio = parseFloat(document.getElementById('catalogoPrecio').value);
+
+      if (!nombre || isNaN(precio) || precio <= 0) {
+        mostrarToast('Ingresa un nombre y precio válido', 'error');
+        return;
+      }
+
+      const item = {
+        nombre: nombre,
+        precio: Math.round(precio * 100) / 100
+      };
+
+      if (editIdx >= 0 && editIdx < catalogoProductos.length) {
+        catalogoProductos[editIdx] = item;
+        mostrarToast('Producto actualizado');
+      } else {
+        catalogoProductos.push(item);
+        mostrarToast('Producto agregado al catálogo');
+      }
+
+      guardarCatalogo();
+      cancelarEdicionCatalogo();
+      renderizarListaCatalogo();
+    }
+
+    function editarProductoCatalogo(idx) {
+      const prod = catalogoProductos[idx];
+      if (!prod) return;
+      document.getElementById('catalogoEditIndex').value = idx;
+      document.getElementById('catalogoNombre').value = prod.nombre;
+      document.getElementById('catalogoPrecio').value = Number(prod.precio).toFixed(2);
+      document.getElementById('tituloFormCatalogo').textContent = 'Editando Producto';
+      document.getElementById('btnGuardarCatalogo').textContent = 'Guardar Cambios';
+      document.getElementById('btnCancelarEdicionCatalogo').classList.remove('hidden');
+      actualizarPreviewPrecioCatalogo();
+      document.getElementById('catalogoNombre').focus();
+    }
+
+    function cancelarEdicionCatalogo() {
+      const form = document.getElementById('formProductoCatalogo');
+      if (form) form.reset();
+      document.getElementById('catalogoEditIndex').value = '-1';
+      document.getElementById('tituloFormCatalogo').textContent = 'Agregar Nuevo Dulce';
+      document.getElementById('btnGuardarCatalogo').textContent = '+ Agregar al Catálogo';
+      document.getElementById('btnCancelarEdicionCatalogo').classList.add('hidden');
+      actualizarPreviewPrecioCatalogo();
+    }
+
+    function confirmarEliminarProductoCatalogo(idx) {
+      const prod = catalogoProductos[idx];
+      if (!prod) return;
+      document.getElementById('confirmTitulo').textContent = '¿Eliminar "' + prod.nombre + '"?';
+      document.getElementById('confirmMensaje').textContent = 'Se quitará de los botones rápidos de ventas.';
+      document.getElementById('btnConfirmarAccion').onclick = function () {
+        catalogoProductos.splice(idx, 1);
+        guardarCatalogo();
+        cancelarEdicionCatalogo();
+        renderizarListaCatalogo();
+        cerrarModal('modalConfirmar');
+        mostrarToast('Producto eliminado');
+      };
+      document.getElementById('modalConfirmar').classList.remove('hidden');
+    }
+
+    function confirmarRestaurarCatalogo() {
+      document.getElementById('confirmTitulo').textContent = '¿Restaurar catálogo predeterminado?';
+      document.getElementById('confirmMensaje').textContent = 'Se cargarán los 6 productos base de Pachon\'s Bakehouse.';
+      document.getElementById('btnConfirmarAccion').onclick = function () {
+        catalogoProductos = clonarCatalogoBase();
+        guardarCatalogo();
+        cancelarEdicionCatalogo();
+        renderizarListaCatalogo();
+        cerrarModal('modalConfirmar');
+        mostrarToast('Catálogo predeterminado restaurado');
+      };
+      document.getElementById('modalConfirmar').classList.remove('hidden');
+    }
+
+    // ---------------------------------------------------------------------
+    // 8. CÁLCULOS FINANCIEROS Y RENDERIZADO DE CLIENTES (VISTA 1)
+    // ---------------------------------------------------------------------
+    function calcularResumenCliente(cliente) {
+      let totalVentas = 0;
+      let totalAbonos = 0;
+      (cliente.movimientos || []).forEach(function (m) {
+        if (m.tipo === 'venta') totalVentas += Number(m.monto) || 0;
+        if (m.tipo === 'abono') totalAbonos += Number(m.monto) || 0;
+      });
+      const saldo = Math.round((totalVentas - totalAbonos) * 100) / 100;
+      return { totalVentas: totalVentas, totalAbonos: totalAbonos, saldo: saldo };
+    }
+
+    function actualizarEstadisticasGlobales() {
+      let porCobrar = 0;
+      let cobrado = 0;
+      let deudores = 0;
+
+      appData.clientes.forEach(function (c) {
+        const res = calcularResumenCliente(c);
+        if (res.saldo > 0.009) {
+          porCobrar += res.saldo;
+          deudores++;
+        }
+        cobrado += res.totalAbonos;
+      });
+
+      document.getElementById('statPorCobrar').textContent = formatearMoneda(porCobrar);
+      document.getElementById('statPorCobrarBs').textContent = bcvConfig.tasa > 0
+        ? formatearBolivares(convertirUSDaBs(porCobrar))
+        : 'Tasa BCV sin configurar';
+
+      document.getElementById('statCobrado').textContent = formatearMoneda(cobrado);
+      document.getElementById('statCobradoBs').textContent = bcvConfig.tasa > 0
+        ? formatearBolivares(convertirUSDaBs(cobrado))
+        : 'Bs. 0,00';
+
+      document.getElementById('statDeudores').textContent = deudores;
+      document.getElementById('statTotalClientes').textContent = 'de ' + appData.clientes.length + ' clientes registrados';
+    }
+
+    function cambiarFiltro(nuevoFiltro) {
+      filtroActual = nuevoFiltro;
+      document.querySelectorAll('.filtro-btn').forEach(function (btn) {
+        btn.classList.remove('bg-cocoa-900', 'text-cream-50');
+        btn.classList.add('bg-cream-100', 'text-cocoa-800');
+      });
+      const activo = document.getElementById('filtro-' + nuevoFiltro);
+      if (activo) {
+        activo.classList.remove('bg-cream-100', 'text-cocoa-800');
+        activo.classList.add('bg-cocoa-900', 'text-cream-50');
+      }
+      renderizarClientes();
+    }
+
+    function limpiarBusqueda() {
+      document.getElementById('inputBuscar').value = '';
+      renderizarClientes();
+    }
+
+    function toggleHistorialCliente(clienteId) {
+      if (clientesExpandidos.has(clienteId)) {
+        clientesExpandidos.delete(clienteId);
+      } else {
+        clientesExpandidos.add(clienteId);
+      }
+      renderizarClientes();
+    }
+
+    function renderizarClientes() {
+      actualizarEstadisticasGlobales();
+
+      const textoBusqueda = document.getElementById('inputBuscar').value.trim().toLowerCase();
+      const btnLimpiar = document.getElementById('btnLimpiarBusqueda');
+      if (textoBusqueda) {
+        btnLimpiar.classList.remove('hidden');
+      } else {
+        btnLimpiar.classList.add('hidden');
+      }
+
+      const filtrados = appData.clientes
+        .map(function (c) {
+          return { cliente: c, resumen: calcularResumenCliente(c) };
+        })
+        .filter(function (item) {
+          const coincideTexto =
+            item.cliente.nombre.toLowerCase().includes(textoBusqueda) ||
+            item.cliente.telefono.includes(textoBusqueda);
+          if (!coincideTexto) return false;
+          if (filtroActual === 'deuda') return item.resumen.saldo > 0.009;
+          if (filtroActual === 'solventes') return item.resumen.saldo <= 0.009;
+          return true;
+        })
+        .sort(function (a, b) {
+          if (b.resumen.saldo !== a.resumen.saldo) return b.resumen.saldo - a.resumen.saldo;
+          return a.cliente.nombre.localeCompare(b.cliente.nombre);
+        });
+
+      const contenedor = document.getElementById('listaClientes');
+
+      if (appData.clientes.length === 0) {
+        contenedor.innerHTML =
+          '<div class="bg-white rounded-3xl p-8 text-center border border-cream-200 shadow-2xs space-y-3">' +
+            '<div class="w-14 h-14 rounded-2xl bg-cream-100 text-caramel-600 flex items-center justify-center mx-auto text-2xl">🍪</div>' +
+            '<h3 class="font-serif text-lg font-bold text-cocoa-950">Aún no tienes clientes registrados</h3>' +
+            '<p class="text-xs text-cocoa-700 max-w-sm mx-auto">Agrega tu primer cliente para empezar a llevar sus fiados y enviarle cobros por WhatsApp con cálculo BCV.</p>' +
+            '<div class="pt-2 flex flex-wrap justify-center gap-2">' +
+              '<button type="button" onclick="abrirModalCliente()" class="bg-cocoa-900 text-cream-50 text-xs font-semibold px-4 py-2.5 rounded-xl shadow-2xs">+ Crear Primer Cliente</button>' +
+              '<button type="button" onclick="cargarDatosEjemplo()" class="bg-cream-100 text-cocoa-900 text-xs font-semibold px-4 py-2.5 rounded-xl border border-cream-300">Cargar Ejemplo</button>' +
+            '</div>' +
+          '</div>';
+        return;
+      }
+
+      if (filtrados.length === 0) {
+        contenedor.innerHTML =
+          '<div class="bg-white rounded-2xl p-6 text-center border border-cream-200 text-xs text-cocoa-700">' +
+            'No se encontraron clientes con ese filtro o búsqueda.' +
+          '</div>';
+        return;
+      }
+
+      contenedor.innerHTML = filtrados.map(function (item) {
+        const cliente = item.cliente;
+        const resumen = item.resumen;
+        const tieneDeuda = resumen.saldo > 0.009;
+        const expandido = clientesExpandidos.has(cliente.id);
+        const movimientosOrdenados = (cliente.movimientos || []).slice().reverse();
+
+        const saldoBsTexto = (tieneDeuda && bcvConfig.tasa > 0)
+          ? '<div class="text-xs font-bold text-caramel-600">' + formatearBolivares(convertirUSDaBs(resumen.saldo)) + '</div>'
+          : '';
+
+        let historialHTML = '';
+        if (expandido) {
+          if (movimientosOrdenados.length === 0) {
+            historialHTML = '<p class="text-xs text-cocoa-700/70 italic py-2">Sin movimientos registrados.</p>';
+          } else {
+            historialHTML = movimientosOrdenados.map(function (m) {
+              const esVenta = m.tipo === 'venta';
+              const montoBsMov = bcvConfig.tasa > 0
+                ? ' (' + formatearBolivares(convertirUSDaBs(m.monto)) + ')'
+                : '';
+              return (
+                '<div class="flex items-center justify-between gap-2 py-2 border-b border-cream-200/70 last:border-0 text-xs">' +
+                  '<div class="min-w-0">' +
+                    '<div class="flex items-center gap-1.5">' +
+                      '<span class="inline-block w-2 h-2 rounded-full ' + (esVenta ? 'bg-caramel-500' : 'bg-emerald-500') + '"></span>' +
+                      '<span class="font-semibold text-cocoa-950 truncate">' + escaparHTML(m.descripcion) + '</span>' +
+                    '</div>' +
+                    '<span class="text-[11px] text-cocoa-700/75 pl-3.5">' + formatearFechaCorta(m.fecha) + '</span>' +
+                  '</div>' +
+                  '<div class="flex items-center gap-2 shrink-0">' +
+                    '<span class="font-bold ' + (esVenta ? 'text-cocoa-900' : 'text-emerald-700') + '">' +
+                      (esVenta ? '+' : '-') + formatearMoneda(m.monto) +
+                      '<span class="text-[10px] font-medium text-cocoa-700/75">' + montoBsMov + '</span>' +
+                    '</span>' +
+                    '<button type="button" onclick="confirmarEliminarMovimiento(\'' + cliente.id + '\', \'' + m.id + '\')" title="Eliminar movimiento" class="text-cocoa-700/50 hover:text-rose-600 p-1 font-bold">✕</button>' +
+                  '</div>' +
+                '</div>'
+              );
+            }).join('');
+          }
+        }
+
+        const botonWhatsApp = tieneDeuda
+          ? '<a href="' + generarEnlaceWhatsAppCobro(cliente, resumen) + '" target="_blank" rel="noopener noreferrer" class="flex-1 min-w-[165px] inline-flex items-center justify-center gap-1.5 bg-whatsapp-500 hover:bg-whatsapp-600 text-white font-bold text-xs py-2.5 px-3 rounded-xl shadow-2xs transition active:scale-95">' +
+              '<span>📲 Cobrar ' + formatearMoneda(resumen.saldo) + (bcvConfig.tasa > 0 ? ' (' + formatearBolivares(convertirUSDaBs(resumen.saldo)) + ')' : '') + '</span>' +
+            '</a>'
+          : '<a href="' + generarEnlaceWhatsAppEstado(cliente, resumen) + '" target="_blank" rel="noopener noreferrer" class="flex-1 min-w-[140px] inline-flex items-center justify-center gap-1.5 bg-cream-100 hover:bg-cream-200 text-cocoa-900 font-semibold text-xs py-2.5 px-3 rounded-xl border border-cream-300 transition active:scale-95">' +
+              '<span>📲 Saludar / Estado</span>' +
+            '</a>';
+
+        return (
+          '<article class="bg-white rounded-2xl border ' + (tieneDeuda ? 'border-caramel-400/60' : 'border-cream-200') + ' shadow-2xs overflow-hidden transition">' +
+            '<div class="p-4 space-y-3">' +
+              '<div class="flex items-start justify-between gap-3">' +
+                '<div class="min-w-0">' +
+                  '<div class="flex items-center gap-2 flex-wrap">' +
+                    '<h3 class="font-bold text-base text-cocoa-950 truncate">' + escaparHTML(cliente.nombre) + '</h3>' +
+                    (cliente.nota ? '<span class="text-[11px] bg-cream-100 text-cocoa-800 px-2 py-0.5 rounded-lg font-medium">' + escaparHTML(cliente.nota) + '</span>' : '') +
+                  '</div>' +
+                  '<div class="flex items-center gap-3 mt-1 text-xs text-cocoa-700">' +
+                    '<span>' + mostrarTelefonoBonito(cliente.telefono) + '</span>' +
+                    '<button type="button" onclick="abrirModalCliente(\'' + cliente.id + '\')" class="text-caramel-600 hover:underline font-semibold">Editar</button>' +
+                    '<button type="button" onclick="confirmarEliminarCliente(\'' + cliente.id + '\')" class="text-rose-600/80 hover:underline">Eliminar</button>' +
+                  '</div>' +
+                '</div>' +
+
+                '<div class="text-right shrink-0">' +
+                  '<span class="inline-block text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg ' + (tieneDeuda ? 'bg-amber-100 text-amber-900' : 'bg-emerald-100 text-emerald-800') + '">' +
+                    (tieneDeuda ? 'Debe' : 'Solvente') +
+                  '</span>' +
+                  '<div class="text-xl font-extrabold mt-0.5 ' + (tieneDeuda ? 'text-cocoa-950' : 'text-emerald-700') + '">' +
+                    formatearMoneda(Math.max(0, resumen.saldo)) +
+                  '</div>' +
+                  saldoBsTexto +
+                '</div>' +
+              '</div>' +
+
+              '<!-- 4 Acciones Claras por Cliente -->' +
+              '<div class="flex flex-wrap items-center gap-2 pt-1">' +
+                botonWhatsApp +
+                '<button type="button" onclick="abrirModalVenta(\'' + cliente.id + '\')" class="inline-flex items-center justify-center gap-1 bg-caramel-500/15 hover:bg-caramel-500/25 text-caramel-600 font-bold text-xs py-2.5 px-3 rounded-xl transition active:scale-95">' +
+                  '<span>+ Venta</span>' +
+                '</button>' +
+                '<button type="button" onclick="abrirModalAbono(\'' + cliente.id + '\')" class="inline-flex items-center justify-center gap-1 bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-700 font-bold text-xs py-2.5 px-3 rounded-xl transition active:scale-95">' +
+                  '<span>+ Abono</span>' +
+                '</button>' +
+                '<a href="' + generarEnlaceWhatsAppEstado(cliente, resumen) + '" target="_blank" rel="noopener noreferrer" class="inline-flex items-center justify-center gap-1 bg-cream-100 hover:bg-cream-200 text-cocoa-900 font-semibold text-xs py-2.5 px-3 rounded-xl border border-cream-300 transition active:scale-95">' +
+                  '<span>Estado de Cuenta</span>' +
+                '</a>' +
+                '<button type="button" onclick="toggleHistorialCliente(\'' + cliente.id + '\')" class="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-cocoa-700 hover:text-cocoa-950 py-2 px-2.5 rounded-xl hover:bg-cream-100 transition">' +
+                  '<span>' + (expandido ? 'Ocultar' : 'Historial') + ' (' + (cliente.movimientos || []).length + ')</span>' +
+                '</button>' +
+              '</div>' +
+            '</div>' +
+
+            (expandido ? '<div class="bg-cream-50/90 border-t border-cream-200 px-4 py-3">' + historialHTML + '</div>' : '') +
+          '</article>'
+        );
+      }).join('');
+    }
+
+    // ---------------------------------------------------------------------
+    // 9. GENERACIÓN DE ENLACES DE WHATSAPP (COBRO Y ESTADO DE CUENTA)
+    // ---------------------------------------------------------------------
+    function generarEnlaceWhatsAppCobro(cliente, resumen) {
+      const primerNombre = cliente.nombre.trim().split(' ')[0];
+      const ventasRecientes = (cliente.movimientos || [])
+        .filter(function (m) { return m.tipo === 'venta'; })
+        .slice(-3);
+
+      let detalle = '';
+      if (ventasRecientes.length > 0) {
+        const lista = ventasRecientes.map(function (v) {
+          return '• ' + v.descripcion + ' (' + formatearMoneda(v.monto) + ')';
+        }).join('\n');
+        detalle = '\n\n*Detalle reciente:*\n' + lista;
+      }
+
+      let bloqueMonto = 'tu saldo pendiente actual es de *' + formatearMoneda(resumen.saldo) + '*';
+      if (bcvConfig.tasa > 0) {
+        const montoBs = convertirUSDaBs(resumen.saldo);
+        bloqueMonto += ' (*' + formatearBolivares(montoBs) + '* a tasa BCV ' + formatearBolivares(bcvConfig.tasa) + ')';
+      }
+
+      const bloquePM = construirBloquePagoMovilWhatsApp();
+
+      const mensaje =
+        '¡Hola ' + primerNombre + '! 👋 Te escribo de *Pachon\'s Bakehouse* 🍪✨ para comentarte que ' +
+        bloqueMonto + '.' + detalle + bloquePM +
+        '\n\n¡Avísame cualquier cosa o si deseas pedir algún otro dulce! 🤎';
+
+      return 'https://wa.me/' + cliente.telefono + '?text=' + encodeURIComponent(mensaje);
+    }
+
+    function generarEnlaceWhatsAppEstado(cliente, resumen) {
+      const primerNombre = cliente.nombre.trim().split(' ')[0];
+      const movs = (cliente.movimientos || []).slice(-10);
+
+      let cuerpoMovs = 'Sin movimientos registrados aún.';
+      if (movs.length > 0) {
+        cuerpoMovs = movs.map(function (m) {
+          const signo = m.tipo === 'venta' ? '➕' : '✅';
+          return signo + ' ' + formatearFechaCorta(m.fecha) + ' - ' + m.descripcion + ': *' + formatearMoneda(m.monto) + '*';
+        }).join('\n');
+      }
+
+      const saldoActual = Math.max(0, resumen.saldo);
+      let lineaSaldo = '*Saldo pendiente:* ' + formatearMoneda(saldoActual);
+      if (saldoActual > 0 && bcvConfig.tasa > 0) {
+        lineaSaldo += ' (*' + formatearBolivares(convertirUSDaBs(saldoActual)) + '* a tasa BCV ' + formatearBolivares(bcvConfig.tasa) + ')';
+      }
+
+      const bloquePM = saldoActual > 0 ? construirBloquePagoMovilWhatsApp() : '';
+
+      const mensaje =
+        '¡Hola ' + primerNombre + '! 🍪 Aquí tienes tu *Estado de Cuenta* en *Pachon\'s Bakehouse*:\n\n' +
+        cuerpoMovs + '\n\n' + lineaSaldo + bloquePM + '\n\n¡Gracias por preferirnos! ✨';
+
+      return 'https://wa.me/' + cliente.telefono + '?text=' + encodeURIComponent(mensaje);
+    }
+
+    // ---------------------------------------------------------------------
+    // 10. MODALES: CLIENTES, VENTAS Y ABONOS
+    // ---------------------------------------------------------------------
+    function cerrarModal(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    function abrirModalCliente(clienteId) {
+      const form = document.getElementById('formCliente');
+      form.reset();
+      document.getElementById('clienteId').value = '';
+
+      if (clienteId) {
+        const c = appData.clientes.find(function (x) { return x.id === clienteId; });
+        if (!c) return;
+        document.getElementById('tituloModalCliente').textContent = 'Editar Cliente';
+        document.getElementById('clienteId').value = c.id;
+        document.getElementById('clienteNombre').value = c.nombre;
+        document.getElementById('clienteTelefono').value = c.telefono.startsWith('58') ? '0' + c.telefono.slice(2) : c.telefono;
+        document.getElementById('clienteNota').value = c.nota || '';
+        document.getElementById('grupoDeudaInicial').classList.add('hidden');
+      } else {
+        document.getElementById('tituloModalCliente').textContent = 'Nuevo Cliente';
+        document.getElementById('grupoDeudaInicial').classList.remove('hidden');
+      }
+
+      document.getElementById('modalCliente').classList.remove('hidden');
+      setTimeout(function () { document.getElementById('clienteNombre').focus(); }, 100);
+    }
+
+    function guardarCliente(e) {
+      e.preventDefault();
+      const id = document.getElementById('clienteId').value;
+      const nombre = document.getElementById('clienteNombre').value.trim();
+      const telRaw = document.getElementById('clienteTelefono').value.trim();
+      const telefono = normalizarTelefonoVE(telRaw);
+      const nota = document.getElementById('clienteNota').value.trim();
+      const deudaInicial = parseFloat(document.getElementById('clienteDeudaInicial').value) || 0;
+
+      if (!nombre || telefono.length < 10) {
+        mostrarToast('Ingresa un nombre y teléfono válido', 'error');
+        return;
+      }
+
+      if (id) {
+        const idx = appData.clientes.findIndex(function (c) { return c.id === id; });
+        if (idx !== -1) {
+          appData.clientes[idx].nombre = nombre;
+          appData.clientes[idx].telefono = telefono;
+          appData.clientes[idx].nota = nota;
+        }
+        mostrarToast('Cliente actualizado');
+      } else {
+        const movimientos = [];
+        if (deudaInicial > 0) {
+          movimientos.push({
+            id: 'mov_' + Date.now(),
+            tipo: 'venta',
+            descripcion: 'Saldo inicial',
+            monto: Math.round(deudaInicial * 100) / 100,
+            fecha: obtenerFechaHoy()
+          });
+        }
+        appData.clientes.push({
+          id: 'cli_' + Date.now(),
+          nombre: nombre,
+          telefono: telefono,
+          nota: nota,
+          movimientos: movimientos
+        });
+        mostrarToast('Cliente agregado');
+      }
+
+      guardarDatos();
+      renderizarClientes();
+      cerrarModal('modalCliente');
+    }
+
+    function confirmarEliminarCliente(clienteId) {
+      const c = appData.clientes.find(function (x) { return x.id === clienteId; });
+      if (!c) return;
+      document.getElementById('confirmTitulo').textContent = '¿Eliminar a ' + c.nombre + '?';
+      document.getElementById('confirmMensaje').textContent = 'Se borrará su historial de ventas y abonos.';
+      document.getElementById('btnConfirmarAccion').onclick = function () {
+        appData.clientes = appData.clientes.filter(function (x) { return x.id !== clienteId; });
+        guardarDatos();
+        renderizarClientes();
+        cerrarModal('modalConfirmar');
+        mostrarToast('Cliente eliminado');
+      };
+      document.getElementById('modalConfirmar').classList.remove('hidden');
+    }
+
+    // --- VENTAS ---
+    function poblarSelectClientes(selectId, preseleccionadoId) {
+      const sel = document.getElementById(selectId);
+      if (appData.clientes.length === 0) {
+        sel.innerHTML = '<option value="">-- Crea un cliente primero --</option>';
+        return false;
+      }
+      const ordenados = appData.clientes.slice().sort(function (a, b) {
+        return a.nombre.localeCompare(b.nombre);
+      });
+      sel.innerHTML = ordenados.map(function (c) {
+        return '<option value="' + c.id + '"' + (c.id === preseleccionadoId ? ' selected' : '') + '>' + escaparHTML(c.nombre) + '</option>';
+      }).join('');
+      return true;
+    }
+
+    function renderizarProductosRapidos() {
+      const cont = document.getElementById('productosRapidosContainer');
+      if (catalogoProductos.length === 0) {
+        cont.innerHTML = '<p class="text-[11px] text-cocoa-700/70 italic">Catálogo vacío. Agrégalos en Catálogo de Dulces.</p>';
+        return;
+      }
+      cont.innerHTML = catalogoProductos.map(function (p, idx) {
+        return '<button type="button" onclick="agregarProductoRapido(' + idx + ')" class="text-[11px] font-semibold bg-cream-100 hover:bg-caramel-500 hover:text-white text-cocoa-900 border border-cream-300 px-2.5 py-1.5 rounded-xl transition active:scale-95">' +
+          '+ ' + escaparHTML(p.nombre) + ' ($' + Number(p.precio).toFixed(2) + ')' +
+        '</button>';
+      }).join('');
+    }
+
+    function agregarProductoRapido(idx) {
+      const prod = catalogoProductos[idx];
+      if (!prod) return;
+      const inputDesc = document.getElementById('ventaDescripcion');
+      const inputMonto = document.getElementById('ventaMonto');
+
+      const actual = inputDesc.value.trim();
+      inputDesc.value = actual ? actual + ' + 1x ' + prod.nombre : '1x ' + prod.nombre;
+
+      const montoActual = parseFloat(inputMonto.value) || 0;
+      inputMonto.value = (montoActual + Number(prod.precio)).toFixed(2);
+      actualizarVistaPreviaVentaBs();
+    }
+
+    function actualizarVistaPreviaVentaBs() {
+      const m = parseFloat(document.getElementById('ventaMonto').value) || 0;
+      const el = document.getElementById('textoVentaBs');
+      el.textContent = bcvConfig.tasa > 0
+        ? 'Equivale a: ' + formatearBolivares(convertirUSDaBs(m))
+        : 'Sin tasa BCV configurada';
+    }
+
+    function abrirModalVenta(clienteId) {
+      if (!poblarSelectClientes('ventaClienteId', clienteId)) {
+        mostrarToast('Primero crea un cliente', 'error');
+        abrirModalCliente();
+        return;
+      }
+      document.getElementById('formVenta').reset();
+      if (clienteId) document.getElementById('ventaClienteId').value = clienteId;
+      document.getElementById('ventaFecha').value = obtenerFechaHoy();
+      renderizarProductosRapidos();
+      actualizarVistaPreviaVentaBs();
+      document.getElementById('modalVenta').classList.remove('hidden');
+    }
+
+    function guardarVenta(e) {
+      e.preventDefault();
+      const clienteId = document.getElementById('ventaClienteId').value;
+      const descripcion = document.getElementById('ventaDescripcion').value.trim();
+      const monto = parseFloat(document.getElementById('ventaMonto').value);
+      const fecha = document.getElementById('ventaFecha').value;
+
+      const cliente = appData.clientes.find(function (c) { return c.id === clienteId; });
+      if (!cliente || !descripcion || isNaN(monto) || monto <= 0) {
+        mostrarToast('Revisa los datos de la venta', 'error');
+        return;
+      }
+
+      cliente.movimientos.push({
+        id: 'mov_' + Date.now(),
+        tipo: 'venta',
+        descripcion: descripcion,
+        monto: Math.round(monto * 100) / 100,
+        fecha: fecha
+      });
+
+      clientesExpandidos.add(cliente.id);
+      guardarDatos();
+      renderizarClientes();
+      cerrarModal('modalVenta');
+      mostrarToast('Venta anotada a ' + cliente.nombre.split(' ')[0]);
+    }
+
+    // --- ABONOS (CON CONVERSIÓN BS <-> USD) ---
+    function cambiarMonedaAbono(moneda) {
+      monedaAbonoActual = moneda;
+      const btnUSD = document.getElementById('btnMonedaUSD');
+      const btnBS = document.getElementById('btnMonedaBS');
+      const label = document.getElementById('labelMontoAbono');
+
+      if (moneda === 'USD') {
+        btnUSD.classList.add('bg-emerald-600', 'text-white');
+        btnUSD.classList.remove('text-cocoa-800');
+        btnBS.classList.remove('bg-emerald-600', 'text-white');
+        btnBS.classList.add('text-cocoa-800');
+        label.textContent = 'Abono ($) *';
+      } else {
+        if (!bcvConfig.tasa || bcvConfig.tasa <= 0) {
+          mostrarToast('Configura primero la Tasa BCV arriba', 'error');
+          cambiarMonedaAbono('USD');
+          return;
+        }
+        btnBS.classList.add('bg-emerald-600', 'text-white');
+        btnBS.classList.remove('text-cocoa-800');
+        btnUSD.classList.remove('bg-emerald-600', 'text-white');
+        btnUSD.classList.add('text-cocoa-800');
+        label.textContent = 'Abono (Bs.) *';
+      }
+      document.getElementById('abonoMonto').value = '';
+      actualizarConversionAbono();
+    }
+
+    function actualizarConversionAbono() {
+      const raw = parseFloat(document.getElementById('abonoMonto').value) || 0;
+      const texto = document.getElementById('textoConversionAbono');
+      if (!bcvConfig.tasa || bcvConfig.tasa <= 0) {
+        texto.textContent = 'Sin tasa BCV configurada';
+        return;
+      }
+      if (monedaAbonoActual === 'USD') {
+        texto.textContent = 'Equivale a: ' + formatearBolivares(convertirUSDaBs(raw));
+      } else {
+        const usd = raw / bcvConfig.tasa;
+        texto.textContent = 'Se descontará: ' + formatearMoneda(usd);
+      }
+    }
+
+    function abrirModalAbono(clienteId) {
+      if (!poblarSelectClientes('abonoClienteId', clienteId)) {
+        mostrarToast('Primero crea un cliente', 'error');
+        abrirModalCliente();
+        return;
+      }
+      document.getElementById('formAbono').reset();
+      cambiarMonedaAbono('USD');
+      if (clienteId) document.getElementById('abonoClienteId').value = clienteId;
+      document.getElementById('abonoFecha').value = obtenerFechaHoy();
+      actualizarInfoDeudaAbono();
+      document.getElementById('modalAbono').classList.remove('hidden');
+    }
+
+    function actualizarInfoDeudaAbono() {
+      const clienteId = document.getElementById('abonoClienteId').value;
+      const cliente = appData.clientes.find(function (c) { return c.id === clienteId; });
+      if (!cliente) return;
+      const res = calcularResumenCliente(cliente);
+      const saldoPos = Math.max(0, res.saldo);
+      const extraBs = (saldoPos > 0 && bcvConfig.tasa > 0)
+        ? ' (' + formatearBolivares(convertirUSDaBs(saldoPos)) + ')'
+        : '';
+      document.getElementById('textoDeudaAbono').textContent = formatearMoneda(saldoPos) + extraBs;
+    }
+
+    function saldarTotalAbono() {
+      const clienteId = document.getElementById('abonoClienteId').value;
+      const cliente = appData.clientes.find(function (c) { return c.id === clienteId; });
+      if (!cliente) return;
+      const res = calcularResumenCliente(cliente);
+      if (res.saldo > 0) {
+        if (monedaAbonoActual === 'USD') {
+          document.getElementById('abonoMonto').value = res.saldo.toFixed(2);
+        } else if (bcvConfig.tasa > 0) {
+          document.getElementById('abonoMonto').value = convertirUSDaBs(res.saldo).toFixed(2);
+        }
+        actualizarConversionAbono();
+      }
+    }
+
+    function guardarAbono(e) {
+      e.preventDefault();
+      const clienteId = document.getElementById('abonoClienteId').value;
+      const montoIngresado = parseFloat(document.getElementById('abonoMonto').value);
+      const fecha = document.getElementById('abonoFecha').value;
+      const radio = document.querySelector('input[name="metodoPago"]:checked');
+      const metodo = radio ? radio.value : 'Pago';
+
+      const cliente = appData.clientes.find(function (c) { return c.id === clienteId; });
+      if (!cliente || isNaN(montoIngresado) || montoIngresado <= 0) {
+        mostrarToast('Ingresa un monto válido', 'error');
+        return;
+      }
+
+      let montoUSD = montoIngresado;
+      let extraDesc = '';
+      if (monedaAbonoActual === 'BS') {
+        if (!bcvConfig.tasa || bcvConfig.tasa <= 0) {
+          mostrarToast('Configura una tasa BCV válida', 'error');
+          return;
+        }
+        montoUSD = montoIngresado / bcvConfig.tasa;
+        extraDesc = ' - ' + formatearBolivares(montoIngresado);
+      }
+
+      cliente.movimientos.push({
+        id: 'mov_' + Date.now(),
+        tipo: 'abono',
+        descripcion: 'Abono (' + metodo + extraDesc + ')',
+        monto: Math.round(montoUSD * 100) / 100,
+        fecha: fecha
+      });
+
+      clientesExpandidos.add(cliente.id);
+      guardarDatos();
+      renderizarClientes();
+      cerrarModal('modalAbono');
+      mostrarToast('Abono de ' + formatearMoneda(montoUSD) + ' registrado');
+    }
+
+    function confirmarEliminarMovimiento(clienteId, movId) {
+      document.getElementById('confirmTitulo').textContent = '¿Eliminar movimiento?';
+      document.getElementById('confirmMensaje').textContent = 'El saldo del cliente se recalculará.';
+      document.getElementById('btnConfirmarAccion').onclick = function () {
+        const cliente = appData.clientes.find(function (c) { return c.id === clienteId; });
+        if (cliente) {
+          cliente.movimientos = cliente.movimientos.filter(function (m) { return m.id !== movId; });
+          guardarDatos();
+          renderizarClientes();
+        }
+        cerrarModal('modalConfirmar');
+        mostrarToast('Movimiento eliminado');
+      };
+      document.getElementById('modalConfirmar').classList.remove('hidden');
+    }
+
+    // ---------------------------------------------------------------------
+    // 11. RESPALDOS JSON E IMPORTACIÓN CSV (VISTA 4)
+    // ---------------------------------------------------------------------
+    function exportarJSON() {
+      const payload = {
+        clientes: appData.clientes,
+        catalogo: catalogoProductos,
+        pagoMovil: pagoMovilConfig,
+        bcv: bcvConfig
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'respaldo-pachons-' + obtenerFechaHoy() + '.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      mostrarToast('Respaldo JSON descargado');
+    }
+
+    function importarJSON(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        try {
+          const parsed = JSON.parse(ev.target.result);
+          if (parsed && Array.isArray(parsed.clientes)) {
+            appData = { clientes: parsed.clientes };
+            guardarDatos();
+
+            if (Array.isArray(parsed.catalogo)) {
+              catalogoProductos = parsed.catalogo;
+              guardarCatalogo();
+            }
+            if (parsed.pagoMovil && typeof parsed.pagoMovil === 'object') {
+              pagoMovilConfig = Object.assign({}, pagoMovilConfig, parsed.pagoMovil);
+              guardarConfigPagoMovil();
+              cargarFormularioPagoMovil();
+              actualizarBadgePagoMovil();
+            }
+            if (parsed.bcv && typeof parsed.bcv === 'object') {
+              bcvConfig = Object.assign({}, bcvConfig, parsed.bcv);
+              guardarConfigBCV();
+              renderizarWidgetBCV();
+            }
+
+            cambiarVista('cuentas');
+            mostrarToast('Respaldo restaurado (' + appData.clientes.length + ' clientes)');
+          } else {
+            mostrarToast('Archivo JSON inválido', 'error');
+          }
+        } catch (err) {
+          mostrarToast('Error leyendo el archivo JSON', 'error');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    function importarCSV(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (ev) {
+        try {
+          const lineas = ev.target.result.split(/\r?\n/).filter(function (l) { return l.trim().length > 0; });
+          let count = 0;
+          const hoy = obtenerFechaHoy();
+
+          lineas.forEach(function (linea, idx) {
+            const sep = linea.includes(';') ? ';' : ',';
+            const cols = linea.split(sep).map(function (c) { return c.trim().replace(/^"|"$/g, ''); });
+            if (idx === 0 && /nombre|cliente/i.test(cols[0])) return;
+
+            const nombre = cols[0];
+            const tel = normalizarTelefonoVE(cols[1] || '');
+            const deuda = parseFloat((cols[2] || '0').replace(',', '.'));
+
+            if (nombre && tel.length >= 10) {
+              const movs = [];
+              if (!isNaN(deuda) && deuda > 0) {
+                movs.push({
+                  id: 'mov_csv_' + Date.now() + '_' + idx,
+                  tipo: 'venta',
+                  descripcion: 'Saldo importado de Excel',
+                  monto: Math.round(deuda * 100) / 100,
+                  fecha: hoy
+                });
+              }
+              appData.clientes.push({
+                id: 'cli_csv_' + Date.now() + '_' + idx,
+                nombre: nombre,
+                telefono: tel,
+                nota: 'Importado CSV',
+                movimientos: movs
+              });
+              count++;
+            }
+          });
+
+          if (count > 0) {
+            guardarDatos();
+            cambiarVista('cuentas');
+            mostrarToast(count + ' clientes importados desde CSV');
+          } else {
+            mostrarToast('No se encontraron filas válidas en el CSV', 'error');
+          }
+        } catch (err) {
+          mostrarToast('Error procesando el archivo CSV', 'error');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    function cargarDatosEjemplo() {
+      const hoy = obtenerFechaHoy();
+      appData.clientes.push({
+        id: 'cli_ej_' + Date.now(),
+        nombre: 'Carlos Mendoza (Prueba)',
+        telefono: '584149876543',
+        nota: 'Cliente frecuente',
+        movimientos: [
+          { id: 'mov_ej_' + Date.now(), tipo: 'venta', descripcion: '2x Galleta Choco Chip 30g + 1x Brownie Fudge 7x7', monto: 5.50, fecha: hoy }
+        ]
+      });
+      guardarDatos();
+      cambiarVista('cuentas');
+      mostrarToast('Cliente de ejemplo agregado');
+    }
+
+    function confirmarLimpiarTodo() {
+      document.getElementById('confirmTitulo').textContent = '¿Borrar toda la base de datos?';
+      document.getElementById('confirmMensaje').textContent = 'Se eliminarán todos los clientes, ventas y abonos.';
+      document.getElementById('btnConfirmarAccion').onclick = function () {
+        appData = { clientes: [] };
+        guardarDatos();
+        renderizarClientes();
+        cerrarModal('modalConfirmar');
+        mostrarToast('Base de datos vaciada');
+      };
+      document.getElementById('modalConfirmar').classList.remove('hidden');
+    }
+
+    // ---------------------------------------------------------------------
+    // 12. INICIALIZACIÓN SEGURA AL CARGAR EL DOM
+    // ---------------------------------------------------------------------
+    document.addEventListener('DOMContentLoaded', function () {
+      cargarDatos();
+      renderizarClientes();
+      sincronizarTasaBCV(true);
+    });
+  </script>
+</body>
+</html>
