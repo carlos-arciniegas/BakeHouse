@@ -44,7 +44,7 @@ Sin librerías de componentes ni de estado: el diseño es CSS propio y el estado
 
 **Saldo = ventas − pagos, con signo.** Un saldo positivo es deuda y uno negativo es saldo a favor. La primera versión ocultaba los negativos con `Math.max(0, …)` y el dinero adelantado "desaparecía". Ahora se muestra en la fila, en el resumen y en el estado de cuenta.
 
-**Varios países sin código especial por país.** Cada país es una entrada de configuración: moneda, formato y prefijo telefónico. Los montos se formatean con `Intl.NumberFormat` ("17,50 €", "$11,00", "£11.00"). Los teléfonos se normalizan a lo que pide `wa.me`, sea cual sea la forma en que se escriban: con 0, con +, con 00 o con el prefijo ya puesto. Los bolívares y la tasa BCV solo aparecen si el país es Venezuela.
+**Varios países sin código especial por país.** Cada país es una entrada de configuración: moneda, formato y prefijo telefónico. Los montos se formatean con `Intl.NumberFormat` ("17,50 €", "$11,00", "£11.00"). Los teléfonos se normalizan al formato internacional que pide WhatsApp, sea cual sea la forma en que se escriban: con 0, con +, con 00 o con el prefijo ya puesto. Los bolívares y la tasa BCV solo aparecen si el país es Venezuela.
 
 **Menos toques, más claridad.** Cada flujo se diseñó contando toques:
 

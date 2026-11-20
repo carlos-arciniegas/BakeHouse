@@ -57,7 +57,15 @@ describe('mensajeEstadoCuenta', () => {
 })
 
 describe('enlaceWhatsApp', () => {
-  it('codifica el mensaje para wa.me', () => {
-    expect(enlaceWhatsApp('584121234567', '¡Hola! *$3*')).toBe('https://wa.me/584121234567?text=%C2%A1Hola!%20*%243*')
+  it('codifica el mensaje para WhatsApp', () => {
+    expect(enlaceWhatsApp('584121234567', '¡Hola! *$3*')).toBe('https://api.whatsapp.com/send?phone=584121234567&text=%C2%A1Hola!%20*%243*')
+  })
+
+  it('no usa wa.me, que cambia los emojis por "�" al redirigir', () => {
+    const enlace = enlaceWhatsApp('584121234567', 'Hola 👋 🍪✨')
+    expect(enlace).not.toContain('wa.me')
+    // Los emojis viajan codificados en UTF-8 y vuelven intactos
+    expect(decodeURIComponent(new URL(enlace).searchParams.get('text')!)).toBe('Hola 👋 🍪✨')
+    expect(enlace).toContain('%F0%9F%91%8B')
   })
 })

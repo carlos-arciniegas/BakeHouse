@@ -60,6 +60,11 @@ export function mensajeEstadoCuenta(cliente: Cliente, ctx: ContextoMensaje): str
     cuerpo + '\n\n' + lineaSaldo + (bloque ? '\n\n' + bloque : '') + '\n\n¡Gracias por preferirnos! ✨'
 }
 
+/**
+ * Enlace que abre WhatsApp con el mensaje listo.
+ * Se usa api.whatsapp.com/send y no wa.me: wa.me redirige a esta misma dirección y en el
+ * camino cambia los emojis por "�". Con el enlace directo llegan intactos.
+ */
 export function enlaceWhatsApp(telefono: string, mensaje: string): string {
-  return 'https://wa.me/' + telefono + '?text=' + encodeURIComponent(mensaje)
+  return 'https://api.whatsapp.com/send?phone=' + telefono + '&text=' + encodeURIComponent(mensaje)
 }

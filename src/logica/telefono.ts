@@ -2,7 +2,7 @@ import { PAISES } from './paises'
 import type { Pais } from './tipos'
 
 /**
- * Devuelve el número con código de país y solo dígitos, como lo pide wa.me.
+ * Devuelve el número con código de país y solo dígitos, como lo pide WhatsApp.
  * Acepta lo que la gente escribe: con o sin "+", con "00", con el 0 inicial o con el prefijo ya puesto.
  */
 export function normalizarTelefono(tel: string, pais: Pais): string {

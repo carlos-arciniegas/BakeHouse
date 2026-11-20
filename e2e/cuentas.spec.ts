@@ -107,8 +107,10 @@ test('un cliente nuevo guarda el teléfono con el código del país', async ({ p
 test('el cobro por WhatsApp lleva el saldo, los bolívares y los datos de pago', async ({ page }) => {
   const enlace = fila(page, 'José Rodríguez').getByRole('link', { name: /Cobrar \$11,00 por WhatsApp/ })
   const href = (await enlace.getAttribute('href'))!
-  expect(href.startsWith('https://wa.me/584149876543?text=')).toBe(true)
-  const mensaje = plano(decodeURIComponent(href.split('?text=')[1]))
+  expect(href.startsWith('https://api.whatsapp.com/send?phone=584149876543&text=')).toBe(true)
+  const mensaje = plano(new URL(href).searchParams.get('text'))
+  // Los emojis llegan intactos (wa.me los cambiaba por "�")
+  expect(mensaje).toContain('¡Hola José! 👋 Te escribo de *Pachon\'s Bakehouse* 🍪✨')
   expect(mensaje).toContain('tu saldo pendiente actual es de *$11,00* (*Bs. 1.100,00* a tasa BCV Bs. 100,00)')
   expect(mensaje).toContain('*Pago Móvil*\n• Banco: Banesco (0134)')
 })
