@@ -420,3 +420,12 @@ select.entrada {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
   
+
+/* Indicador del guardado en la nube: un punto de color y una línea de texto */
+.estado-nube { display: flex; gap: 10px; align-items: baseline; font-weight: 600; }
+.estado-nube::before {
+  content: ''; flex: none; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--verde); transform: translateY(-1px);
+}
+.estado-nube[data-estado="pendiente"]::before { background: var(--mantequilla); box-shadow: 0 0 0 1px var(--linea-fuerte); }
+.estado-nube[data-estado="error"]::before { background: var(--rojo); }

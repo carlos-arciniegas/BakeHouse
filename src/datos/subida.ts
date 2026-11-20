@@ -90,6 +90,15 @@ export function guardarSubida(a: Almacen, resumen: ResumenSubida): void {
   }
 }
 
+/** Al cerrar sesión: lo que se anote mientras tanto no queda en la cola, así que habrá que volver a subir todo */
+export function olvidarSubida(a: Pick<Storage, 'removeItem'>): void {
+  try {
+    a.removeItem(CLAVE_SUBIDA)
+  } catch {
+    // sin almacenamiento
+  }
+}
+
 const contar = (n: number, uno: string, varios: string) => n + ' ' + (n === 1 ? uno : varios)
 
 /** "42 clientes y 318 movimientos" */

@@ -1,9 +1,11 @@
-import type { Session } from '@supabase/supabase-js'
+import type { Session, SupabaseClient } from '@supabase/supabase-js'
 import { useCallback, useEffect, useState } from 'react'
 import { guardarVinculo, leerVinculo, mensajeDeError, type ErrorAuth } from '../datos/cuenta'
 import type { EstadoGuardado } from '../datos/almacenamiento'
 import type { FilaNegocio } from '../datos/nube'
-import { guardarSubida, leerSubida, subirDatos, type Destino, type ResumenSubida } from '../datos/subida'
+import type { Database } from '../datos/baseDeDatos'
+import type { DestinoSync } from '../datos/sincronizacion'
+import { guardarSubida, leerSubida, olvidarSubida, subirDatos, type ResumenSubida } from '../datos/subida'
 import { supabase } from '../datos/supabase'
 import type { Negocio } from '../logica/tipos'
 
@@ -22,6 +24,19 @@ export function useSesion() {
 }
 
 export type ResultadoNube = { ok: true } | { ok: false; mensaje: string }
+
+/** Escribe en las tablas de un negocio de Supabase (lo usan la subida completa y la cola) */
+export function crearDestino(nube: SupabaseClient<Database>, negocioId: string): DestinoSync {
+  const comoError = ({ error, status }: { error: { code: string } | null; status: number }): ErrorAuth | null =>
+    error ? { status, code: error.code } : null
+  return {
+    // upsert por (negocio_id, id): repetir no duplica
+    guardar: async (tabla, filas) => comoError(await nube.from(tabla).upsert(filas as never, { onConflict: 'negocio_id,id' })),
+    actualizarNegocio: async (fila) => comoError(await nube.from('negocios').update(fila).eq('id', negocioId)),
+    borrar: async (tabla, ids, cuando) =>
+      comoError(await nube.from(tabla).update({ borrado_en: cuando }).eq('negocio_id', negocioId).in('id', ids)),
+  }
+}
 
 const fallo = (error: ErrorAuth): ResultadoNube => ({ ok: false, mensaje: mensajeDeError(error) })
 
@@ -94,19 +109,7 @@ export function useCuentaNube() {
     alAvanzar: (enviadas: number, total: number) => void,
   ): Promise<{ ok: true; resumen: ResumenSubida } | { ok: false; mensaje: string }> => {
     if (!supabase || !vinculo) return { ok: false, mensaje: 'Primero conecta este dispositivo a un negocio.' }
-    const nube = supabase
-    const negocioId = vinculo
-    const destino: Destino = {
-      guardar: async (tabla, filas) => {
-        const { error: e, status } = await nube.from(tabla).upsert(filas as never, { onConflict: 'negocio_id,id' })
-        return e ? { status, code: e.code } : null
-      },
-      actualizarNegocio: async (fila) => {
-        const { error: e, status } = await nube.from('negocios').update(fila).eq('id', negocioId)
-        return e ? { status, code: e.code } : null
-      },
-    }
-    const r = await subirDatos(destino, estado, negocioId, alAvanzar)
+    const r = await subirDatos(crearDestino(supabase, vinculo), estado, vinculo, alAvanzar)
     if (!r.ok) {
       const mensaje = mensajeDeError(r.error)
       return { ok: false, mensaje: r.enviadas > 0 ? mensaje + ' Lo que ya se subió no se duplica al reintentar.' : mensaje }
@@ -117,6 +120,9 @@ export function useCuentaNube() {
   }
 
   const cerrarSesion = async () => {
+    // Lo que se anote sin sesión no entra en la cola: al volver habrá que subir todo de nuevo
+    olvidarSubida(localStorage)
+    setSubida(null)
     conectar(null)
     await supabase?.auth.signOut()
   }

@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react'
 import { correoValido, nubeHabilitada } from '../../datos/cuenta'
+import { textoEstadoSync } from '../../datos/sincronizacion'
 import { porcentaje, textoResumen } from '../../datos/subida'
 import { useAvisos, useTienda, useUI } from '../../estado/contextos'
 import { useDescargarCopia } from '../ganchos'
 import { useCuentaNube } from '../nube'
+import { revisarCola, useEstadoSincronizacion } from '../sincronizacion'
 
 /** Se decide una vez al cargar: en desarrollo, o si la app se abrió alguna vez con "?nube=1" */
 const habilitada = nubeHabilitada(localStorage, window.location.search, import.meta.env.DEV)
@@ -67,6 +69,7 @@ function CuentaNubeVisible() {
   const { confirmar } = useUI()
   const avisar = useAvisos()
   const [creando, setCreando] = useState(false)
+  const sync = useEstadoSincronizacion()
   const descargarCopia = useDescargarCopia()
   // Avance de la subida en %, o null si no se está subiendo
   const [avance, setAvance] = useState<number | null>(null)
@@ -86,16 +89,20 @@ function CuentaNubeVisible() {
     setAvance(0)
     const r = await cuenta.subirMisDatos(estado, (enviadas, total) => setAvance(porcentaje(enviadas, total)))
     setAvance(null)
-    if (r.ok) avisar('Datos subidos: ' + textoResumen(r.resumen))
-    else avisar(r.mensaje, { error: true })
+    if (r.ok) {
+      avisar('Datos subidos: ' + textoResumen(r.resumen))
+      // Desde ahora lo que se anote se guarda solo
+      revisarCola()
+    } else avisar(r.mensaje, { error: true })
   }
 
   const cerrarSesion = () => confirmar({
     titulo: '¿Cerrar sesión?',
-    mensaje: 'Tus datos siguen en este dispositivo. Para volver a conectarte te llegará otro enlace por correo.',
+    mensaje: 'Tus datos siguen en este dispositivo, pero lo que anotes ya no se guardará en la nube. Para volver te llegará otro enlace por correo.',
     textoBoton: 'Cerrar sesión',
     alConfirmar: async () => {
       await cuenta.cerrarSesion()
+      revisarCola()
       avisar('Sesión cerrada')
     },
   })
@@ -120,17 +127,29 @@ function CuentaNubeVisible() {
       <>
         <p>Entraste como <b>{cuenta.correo}</b>. Este dispositivo está conectado a <b>{cuenta.conectado.nombre}</b> en la nube.</p>
         {cuenta.ultimaSubida ? (
-          <p>Última subida: {new Date(cuenta.ultimaSubida.fecha).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}, con {textoResumen(cuenta.ultimaSubida)}.
-            Lo que anotes después aún no se sube solo: vuelve a subir cuando quieras.</p>
+          <>
+            <p className="estado-nube" role="status" data-estado={sync.pendientes === 0 && sync.rechazados === 0 ? 'ok' : sync.error && !sync.sinConexion ? 'error' : 'pendiente'}>
+              {textoEstadoSync(sync)}
+            </p>
+            <p>Lo que anotes se guarda solo en la nube; sin conexión, se guarda al volver la red.</p>
+            <div>
+              <button type="button" className="boton boton--borde" onClick={subir} disabled={avance !== null} aria-describedby="ayudaSubir">
+                {avance !== null ? 'Subiendo… ' + avance + ' %' : 'Volver a subir todo'}
+              </button>
+              <p id="ayudaSubir" className="ayuda">Envía de nuevo todo lo del dispositivo, por si algo no cuadra. Antes descarga una copia y no duplica nada.</p>
+            </div>
+          </>
         ) : (
-          <p>Sube tus clientes, ventas, pagos, catálogo y métodos de pago para tenerlos respaldados fuera del teléfono.</p>
+          <>
+            <p>Sube tus clientes, ventas, pagos, catálogo y métodos de pago. Desde ese momento, lo que anotes se guarda solo en la nube.</p>
+            <div>
+              <button type="button" className="boton boton--primario boton--ancho" onClick={subir} disabled={avance !== null} aria-describedby="ayudaSubir">
+                {avance !== null ? 'Subiendo… ' + avance + ' %' : 'Subir mis datos'}
+              </button>
+              <p id="ayudaSubir" className="ayuda">Antes de subir se descarga una copia en este dispositivo. Puedes repetirlo: no se duplica nada.</p>
+            </div>
+          </>
         )}
-        <div>
-          <button type="button" className="boton boton--primario boton--ancho" onClick={subir} disabled={avance !== null} aria-describedby="ayudaSubir">
-            {avance !== null ? 'Subiendo… ' + avance + ' %' : cuenta.ultimaSubida ? 'Volver a subir mis datos' : 'Subir mis datos'}
-          </button>
-          <p id="ayudaSubir" className="ayuda">Antes de subir se descarga una copia en este dispositivo. Puedes repetirlo: no se duplica nada.</p>
-        </div>
         <div className="seccion__acciones">
           <button type="button" className="boton boton--texto" onClick={cerrarSesion}>Cerrar sesión</button>
         </div>

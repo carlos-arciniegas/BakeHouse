@@ -39,6 +39,7 @@ async function simularSupabase(page: Page, opciones: Simulacion = {}) {
       return peticion.method() === 'PATCH' ? ruta.fulfill({ status: 204 }) : ruta.fulfill({ json: opciones.negocios ?? [] })
     }
     if (peticion.method() === 'POST' && TABLAS_DE_DATOS.includes(tabla)) return ruta.fulfill({ status: 201 })
+    if (peticion.method() === 'PATCH' && TABLAS_DE_DATOS.includes(tabla)) return ruta.fulfill({ status: 204 })
     if (url.pathname === '/rest/v1/rpc/crear_negocio') return ruta.fulfill({ json: NEGOCIO_NUBE.id })
     return ruta.fulfill({ status: 500, json: { message: 'Llamada no prevista en la prueba: ' + url.pathname } })
   })
@@ -52,14 +53,19 @@ function tokenFalso() {
   return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: USUARIO.id, email: USUARIO.email, role: 'authenticated', aud: 'authenticated', exp })}.firma`
 }
 
-async function abrirAjustes(page: Page, { conSesion = false, nubeVisible = true } = {}) {
+async function abrirAjustes(page: Page, { conSesion = false, nubeVisible = true, yaSubido = false } = {}) {
   await abrirConDatos(page, DATOS_VENEZUELA)
-  await page.evaluate(({ clave, sesion, nubeVisible }) => {
+  await page.evaluate(({ clave, sesion, nubeVisible, subida }) => {
     if (nubeVisible) localStorage.setItem('pachons_probar_nube_v1', '1')
     if (sesion) localStorage.setItem(clave, JSON.stringify(sesion))
+    if (subida) {
+      localStorage.setItem('pachons_nube_negocio_v1', subida.negocioId)
+      localStorage.setItem('pachons_nube_subida_v1', JSON.stringify(subida))
+    }
   }, {
     clave: CLAVE_SESION,
     nubeVisible,
+    subida: yaSubido ? { negocioId: NEGOCIO_NUBE.id, fecha: '2026-11-20T12:00:00.000Z', clientes: 3, movimientos: 7 } : null,
     sesion: conSesion ? {
       access_token: tokenFalso(), token_type: 'bearer', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, refresh_token: 'refresco',
       user: { ...USUARIO, aud: 'authenticated', role: 'authenticated', app_metadata: { provider: 'email' }, user_metadata: {}, created_at: '2026-11-20T00:00:00Z' },
@@ -159,9 +165,9 @@ test('sube los datos del dispositivo, con una copia descargada antes', async ({ 
   expect(clientes.map((c) => c.id)).toEqual(['c1', 'c2', 'c3'])
   expect(clientes.every((c) => c.negocio_id === NEGOCIO_NUBE.id)).toBe(true)
 
-  // Queda el resumen y el botón invita a repetir
-  await expect(seccion(page)).toContainText('Última subida')
-  await expect(seccion(page).getByRole('button', { name: 'Volver a subir mis datos' })).toBeEnabled()
+  // Desde ahora se guarda solo; volver a subir todo queda como opción secundaria
+  await expect(seccion(page).getByRole('status')).toHaveText('Todo guardado en la nube.')
+  await expect(seccion(page).getByRole('button', { name: 'Volver a subir todo' })).toBeEnabled()
 })
 
 test('si se corta la red a mitad de la subida lo explica y se puede reintentar', async ({ page }) => {
@@ -172,9 +178,80 @@ test('si se corta la red a mitad de la subida lo explica y se puede reintentar',
   await seccion(page).getByRole('button', { name: 'Subir mis datos' }).click()
   await expect(page.locator('.toast').last())
     .toHaveText('No hay conexión. Revisa tu internet y vuelve a intentar. Lo que ya se subió no se duplica al reintentar.')
-  await expect(seccion(page)).not.toContainText('Última subida')
+  await expect(seccion(page).getByRole('status')).toHaveCount(0)
 
   sinRedEn.activo = false
   await seccion(page).getByRole('button', { name: 'Subir mis datos' }).click()
   await expect(page.locator('.toast').last()).toHaveText('Datos subidos: 3 clientes y 7 movimientos')
+})
+
+/** Va a Cuentas y anota un pago de María (deja la hoja con la deuda completa) */
+async function anotarPago(page: Page) {
+  await page.getByRole('navigation', { name: 'Secciones' }).getByRole('button', { name: 'Cuentas' }).click()
+  await fila(page, 'María Fernanda Pérez').getByRole('button', { name: 'Pago', exact: true }).click()
+  await page.getByRole('dialog', { name: 'Nuevo pago' }).getByRole('button', { name: 'Registrar pago' }).click()
+  await expect(page.locator('.toast').last()).toHaveText('Pago de $6,50 registrado')
+  await page.getByRole('navigation', { name: 'Secciones' }).getByRole('button', { name: 'Ajustes' }).click()
+}
+
+const subidasA = (llamadas: Awaited<ReturnType<typeof simularSupabase>>, ruta: string) =>
+  llamadas.filter((l) => l.ruta === ruta && l.metodo === 'POST').map((l) => l.cuerpo as { id: string; tipo?: string; monto?: number }[])
+
+test('después de subir, lo que se anota se guarda solo en la nube', async ({ page }) => {
+  const llamadas = await simularSupabase(page, { negocios: [NEGOCIO_NUBE] })
+  await abrirAjustes(page, { conSesion: true, yaSubido: true })
+  await expect(seccion(page).getByRole('status')).toHaveText('Todo guardado en la nube.')
+
+  await anotarPago(page)
+  await expect(seccion(page).getByRole('status')).toHaveText('Todo guardado en la nube.')
+  await expect.poll(() => subidasA(llamadas, '/rest/v1/movimientos')).toHaveLength(1)
+
+  // Solo viaja el pago nuevo, no todo el historial
+  const [enviado] = subidasA(llamadas, '/rest/v1/movimientos')
+  expect(enviado).toHaveLength(1)
+  expect(enviado[0]).toMatchObject({ tipo: 'abono', monto: 6.5, cliente_id: 'c1', negocio_id: NEGOCIO_NUBE.id, borrado_en: null })
+  expect(subidasA(llamadas, '/rest/v1/clientes')).toHaveLength(0)
+})
+
+test('sin conexión guarda la cola y la envía al volver la red', async ({ page, context }) => {
+  const llamadas = await simularSupabase(page, { negocios: [NEGOCIO_NUBE] })
+  await abrirAjustes(page, { conSesion: true, yaSubido: true })
+  await expect(seccion(page).getByRole('status')).toHaveText('Todo guardado en la nube.')
+
+  await context.setOffline(true)
+  await anotarPago(page)
+  await expect(seccion(page).getByRole('status')).toHaveText('Sin conexión: 1 cambio se guardará al volver la red.')
+  const cola = await page.evaluate(() => JSON.parse(localStorage.getItem('pachons_nube_cola_v1') ?? 'null'))
+  expect(Object.keys(cola.cambios)).toHaveLength(1)
+  expect(subidasA(llamadas, '/rest/v1/movimientos')).toHaveLength(0)
+
+  await context.setOffline(false)
+  await expect(seccion(page).getByRole('status')).toHaveText('Todo guardado en la nube.')
+  expect(subidasA(llamadas, '/rest/v1/movimientos')).toHaveLength(1)
+})
+
+test('borrar un movimiento lo marca como borrado en la nube', async ({ page }) => {
+  const llamadas = await simularSupabase(page, { negocios: [NEGOCIO_NUBE] })
+  await abrirAjustes(page, { conSesion: true, yaSubido: true })
+  await page.getByRole('navigation', { name: 'Secciones' }).getByRole('button', { name: 'Cuentas' }).click()
+
+  const jose = fila(page, 'José Rodríguez')
+  await jose.getByRole('button', { name: /Historial/ }).click()
+  await jose.getByRole('button', { name: 'Eliminar movimiento' }).first().click()
+
+  // No se borra de verdad: se marca, para que los otros dispositivos también lo quiten
+  await expect.poll(() => llamadas.filter((l) => l.metodo === 'PATCH' && l.ruta === '/rest/v1/movimientos').length).toBe(1)
+  const borrado = llamadas.find((l) => l.metodo === 'PATCH' && l.ruta === '/rest/v1/movimientos')!
+  expect(new URL(borrado.url).searchParams.get('id')).toBe('in.(m5)')
+  expect(new URL(borrado.url).searchParams.get('negocio_id')).toBe('eq.' + NEGOCIO_NUBE.id)
+  expect(borrado.cuerpo).toHaveProperty('borrado_en')
+})
+
+test('sin haber subido los datos no se envía nada', async ({ page }) => {
+  const llamadas = await simularSupabase(page, { negocios: [NEGOCIO_NUBE] })
+  await abrirAjustes(page, { conSesion: true })
+  await anotarPago(page)
+  await page.waitForTimeout(2500)
+  expect(llamadas.filter((l) => TABLAS_DE_DATOS.some((t) => l.ruta === '/rest/v1/' + t))).toHaveLength(0)
+  expect(await page.evaluate(() => localStorage.getItem('pachons_nube_cola_v1'))).toBeNull()
 })

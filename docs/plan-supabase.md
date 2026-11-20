@@ -61,11 +61,20 @@ Proyecto `kvvzdbycnabpkkszcpge`, región **eu-west-1 (Irlanda)**. Desde Venezuel
 - Lo que se anota después no se sube solo: eso es la fase 5.
 
 ### Fase 5: sincronización
-- Cada acción del reductor deja un cambio en una **cola local** (`localStorage`). Con red, la cola se envía en orden; si falla, se reintenta.
-- Para traer cambios: "dame lo que cambió desde la última sincronización", con un margen de solapamiento para no perder cambios de transacciones simultáneas; aplicar es idempotente.
-- Se sincroniza al abrir la app, al volver la conexión y cada cierto tiempo con la app abierta.
-- Indicador discreto: "Guardado en la nube" / "Sin conexión: se guardará al volver la red".
-- Pruebas: la lógica de cola y de mezcla con Vitest; los flujos (sin conexión → con conexión, dos dispositivos) con Playwright contra un Supabase local.
+
+#### 5a: enviar los cambios propios (hecho, oculto en producción)
+- Se activa después de la primera "Subir mis datos" a ese negocio (así la nube ya tiene los clientes de los movimientos nuevos). Al cerrar sesión se desactiva y al volver hay que subir todo de nuevo.
+- La tienda compara el estado anterior con el nuevo (`diferencias` en `src/datos/sincronizacion.ts`) y anota en una **cola local** (`pachons_nube_cola_v1`) las filas que cambiaron o se borraron. De cada fila queda solo su último cambio (borrar y deshacer se anulan).
+- `useSincronizacion()` (en `App`) envía la cola 1,5 s después de cada cambio, al abrir la app, al volver la red y al volver a la app. Si falla, reintenta a los 5 s, 10 s, 20 s… hasta 5 min. Lo que cambia durante un envío no se pierde (cada cambio lleva una versión).
+- Lo borrado se marca con `borrado_en` en lugar de borrarse, para que los otros dispositivos también lo quiten (5b).
+- Una fila que la nube rechaza por sus datos se descarta de la cola (sigue en el dispositivo) y se avisa, para que no bloquee lo demás.
+- Indicador en Ajustes: "Todo guardado en la nube", "Sin conexión: 1 cambio se guardará al volver la red", "Tu sesión se cerró…".
+- Pendiente conocido: lo que se borre sin sesión no llega a la nube (volver a subir todo no envía borrados). Se resuelve con 5b.
+
+#### 5b: traer los cambios de otros dispositivos
+- "Dame lo que cambió desde la última sincronización", con un margen de solapamiento para no perder cambios de transacciones simultáneas; aplicar es idempotente.
+- Se trae al abrir la app, al volver la conexión y cada cierto tiempo con la app abierta.
+- Pruebas: la lógica de mezcla con Vitest; los flujos (dos dispositivos) con Playwright.
 
 ### Fase 6: pasar a Pachon's
 0. **Requisito:** configurar un SMTP propio (por ejemplo Resend) en *Authentication → SMTP*. El correo que trae Supabase es de prueba: 2 correos por hora para todo el proyecto, y el inicio de sesión por enlace mágico depende de esos correos.

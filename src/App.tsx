@@ -9,6 +9,7 @@ import { HojaMetodo } from './componentes/hojas/HojaMetodo'
 import { HojaPago } from './componentes/hojas/HojaPago'
 import { HojaVenta } from './componentes/hojas/HojaVenta'
 import { Barra, Navegacion, Toldo } from './componentes/Marco'
+import { useSincronizacion } from './componentes/sincronizacion'
 import { Ajustes } from './componentes/vistas/Ajustes'
 import { Catalogo } from './componentes/vistas/Catalogo'
 import { Cuentas } from './componentes/vistas/Cuentas'
@@ -65,6 +66,8 @@ function Aplicacion() {
   const { estado, pais } = useTienda()
   const { vista } = useUI()
   const { sincronizar } = useSincronizarBCV()
+  // Envía a la nube lo anotado (solo si este dispositivo ya subió sus datos)
+  useSincronizacion()
   const [bcvAlAbrir] = useState(() => Boolean(pais.tasaBCV))
 
   // La pestaña lleva el nombre del negocio; fuera de Venezuela se ocultan bolívares y BCV

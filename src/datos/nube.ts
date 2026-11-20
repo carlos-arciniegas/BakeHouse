@@ -47,6 +47,49 @@ const aCentimos = (n: number) => Math.round(n * 100) / 100
 const FECHA = /^\d{4}-\d{2}-\d{2}$/
 const idValido = (id: string) => id.length >= 1 && id.length <= LIMITE.id
 
+type FilaParaSubir<T extends keyof FilasParaSubir> = FilasParaSubir[T][number]
+
+/** Fila de un cliente lista para la base, o null si su id no cabe. Todo lo local está vigente (borrado_en: null). */
+export function filaCliente(c: Cliente, negocioId: string): FilaParaSubir<'clientes'> | null {
+  if (!idValido(c.id)) return null
+  return {
+    negocio_id: negocioId,
+    id: c.id,
+    nombre: nombreValido(c.nombre),
+    telefono: c.telefono.replace(/\D/g, '').slice(0, LIMITE.telefono),
+    nota: recortar(c.nota, LIMITE.nota),
+    borrado_en: null,
+  }
+}
+
+/** Fila de un movimiento, o null si la base no puede guardarlo (monto que redondeado da 0, id imposible) */
+export function filaMovimiento(m: Movimiento, clienteId: string, negocioId: string, hoy: string): FilaParaSubir<'movimientos'> | null {
+  if (!idValido(m.id) || !(aCentimos(m.monto) > 0)) return null
+  return {
+    negocio_id: negocioId,
+    id: m.id,
+    cliente_id: clienteId,
+    tipo: m.tipo,
+    descripcion: recortar(m.descripcion, LIMITE.descripcion),
+    monto: aCentimos(m.monto),
+    fecha: FECHA.test(m.fecha) ? m.fecha : hoy,
+    productos: (m.productos ?? null) as Json,
+    borrado_en: null,
+  }
+}
+
+export function filaProducto(p: Producto, orden: number, negocioId: string): FilaParaSubir<'productos'> | null {
+  if (!idValido(p.id) || !(aCentimos(p.precio) > 0)) return null
+  return { negocio_id: negocioId, id: p.id, nombre: nombreValido(p.nombre), precio: aCentimos(p.precio), orden, borrado_en: null }
+}
+
+export function filaMetodo(m: MetodoPago, orden: number, negocioId: string): FilaParaSubir<'metodos'> | null {
+  if (!idValido(m.id)) return null
+  return { negocio_id: negocioId, id: m.id, tipo: m.tipo, datos: m.datos, activo: m.activo, orden, borrado_en: null }
+}
+
+const existe = <T>(x: T | null): x is T => x !== null
+
 /**
  * Convierte los datos locales en filas para subirlas a un negocio, ajustadas a los límites de la base
  * para que un dato viejo fuera de rango no haga fallar toda la subida.
@@ -60,33 +103,13 @@ export function datosAFilas(datos: DatosDeNegocio, negocioId: string, base: numb
   const hoy = fechaHoy(new Date(base))
   const clientes = datos.clientes.filter((c) => idValido(c.id))
   return {
-    clientes: clientes.map((c) => ({
-      negocio_id: negocioId,
-      id: c.id,
-      nombre: nombreValido(c.nombre),
-      telefono: c.telefono.replace(/\D/g, '').slice(0, LIMITE.telefono),
-      nota: recortar(c.nota, LIMITE.nota),
-      creado_en: creadoEn(),
-    })),
+    clientes: clientes.map((c) => ({ ...filaCliente(c, negocioId)!, creado_en: creadoEn() })),
     movimientos: clientes.flatMap((c) => c.movimientos
-      .filter((m) => idValido(m.id) && aCentimos(m.monto) > 0)
-      .map((m) => ({
-        negocio_id: negocioId,
-        id: m.id,
-        cliente_id: c.id,
-        tipo: m.tipo,
-        descripcion: recortar(m.descripcion, LIMITE.descripcion),
-        monto: aCentimos(m.monto),
-        fecha: FECHA.test(m.fecha) ? m.fecha : hoy,
-        productos: (m.productos ?? null) as Json,
-        creado_en: creadoEn(),
-      }))),
-    productos: datos.catalogo
-      .filter((p) => idValido(p.id) && aCentimos(p.precio) > 0)
-      .map((p, i) => ({ negocio_id: negocioId, id: p.id, nombre: nombreValido(p.nombre), precio: aCentimos(p.precio), orden: i })),
-    metodos: datos.metodos
-      .filter((m) => idValido(m.id))
-      .map((m, i) => ({ negocio_id: negocioId, id: m.id, tipo: m.tipo, datos: m.datos, activo: m.activo, orden: i })),
+      .map((m) => filaMovimiento(m, c.id, negocioId, hoy))
+      .filter(existe)
+      .map((f) => ({ ...f, creado_en: creadoEn() }))),
+    productos: datos.catalogo.map((p, i) => filaProducto(p, i, negocioId)).filter(existe),
+    metodos: datos.metodos.map((m, i) => filaMetodo(m, i, negocioId)).filter(existe),
   }
 }
 
