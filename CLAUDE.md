@@ -10,7 +10,13 @@ App web (PWA) para que negocios de repostería y emprendimientos lleven el contr
 
 ## Estado actual
 
-- Todo está en un solo archivo: `index.html` (HTML + CSS escrito a mano + JavaScript sin framework, sin dependencias salvo Google Fonts).
+- **Migración en curso a React + TypeScript + Vite** (rama `react`). La versión completa de un solo archivo sigue en `legacy/index.html` como referencia de comportamiento y diseño; se borra cuando la interfaz en React la reemplace.
+- Estructura:
+  - `src/logica/`: funciones puras del dominio (saldo, moneda, teléfonos, países, métodos de pago, mensajes de WhatsApp, venta, BCV). Sin DOM ni `localStorage`; todo lo que necesitan entra por parámetro.
+  - `src/datos/`: `localStorage` (claves, carga, migraciones y saneamiento) y respaldos JSON/CSV. Reciben el almacenamiento por parámetro para poder probarse.
+  - Pruebas junto a cada módulo (`*.test.ts`) con Vitest.
+- Comandos: `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`. Antes de dar algo por terminado deben pasar `npm test`, `npm run typecheck` y `npm run lint`.
+- Toda lógica nueva va en `src/logica/` o `src/datos/` con su prueba; los componentes solo muestran y llaman a esas funciones.
 - Los datos se guardan solo en `localStorage` del navegador.
 - Funciones: clientes con fiado, ventas, pagos en USD o Bs, tasa BCV (API con respaldo manual), métodos de pago configurables (`TIPOS_PAGO`: transferencia/IBAN, Bizum, PayPal, Pago Móvil, Zelle, Binance Pay, otro), cobros y estados de cuenta por WhatsApp, respaldo JSON e importación CSV.
 - Para agregar un método de pago nuevo basta con sumar una entrada a `TIPOS_PAGO`; el formulario, la lista y el mensaje de WhatsApp se generan solos.

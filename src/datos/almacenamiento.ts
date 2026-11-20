@@ -1,0 +1,162 @@
+import { esTipoPago, migrarPagoMovil, type PagoMovilAntiguo } from '../logica/metodosPago'
+import { esCodigoPais, NEGOCIO_PREDETERMINADO } from '../logica/paises'
+import type { Cliente, ConfigBCV, MetodoPago, Movimiento, Negocio, Producto } from '../logica/tipos'
+
+/**
+ * Claves de localStorage. Empiezan por "pachons_" porque así las creó la primera versión;
+ * no se renombran para no perder los datos que ya existen.
+ */
+export const CLAVES = {
+  clientes: 'pachons_bakehouse_data_v3',
+  bcv: 'pachons_bcv_config_v3',
+  pagoMovilAntiguo: 'pachons_pagomovil_v3',
+  metodos: 'pachons_metodos_pago_v1',
+  catalogo: 'pachons_catalog_v3',
+  negocio: 'pachons_negocio_v1',
+  ultimoMetodo: 'pachons_ultimo_metodo_v1',
+} as const
+
+export const CATALOGO_PREDETERMINADO: Producto[] = [
+  { nombre: 'Galleta Choco Chip 30g', precio: 1.5 },
+  { nombre: 'Galleta Doble Chocolate 30g', precio: 1.5 },
+  { nombre: 'Brownie Fudge 7x7', precio: 2.5 },
+  { nombre: 'Brownie Bites (x4)', precio: 3 },
+  { nombre: 'Porción Ponqué', precio: 2 },
+  { nombre: 'Helado Ninja Creami', precio: 3.5 },
+]
+
+export interface EstadoGuardado {
+  clientes: Cliente[]
+  catalogo: Producto[]
+  metodos: MetodoPago[]
+  negocio: Negocio
+  bcv: ConfigBCV
+}
+
+/** Lo mínimo de Storage que se usa; permite probar con un almacenamiento en memoria */
+export type Almacen = Pick<Storage, 'getItem' | 'setItem'>
+
+function leerJSON(almacen: Almacen, clave: string): unknown {
+  try {
+    const crudo = almacen.getItem(clave)
+    return crudo ? JSON.parse(crudo) : null
+  } catch {
+    return null
+  }
+}
+
+export function guardarJSON(almacen: Almacen, clave: string, valor: unknown): void {
+  try {
+    almacen.setItem(clave, JSON.stringify(valor))
+  } catch {
+    // Almacenamiento lleno o bloqueado (modo privado): la app sigue funcionando en memoria
+  }
+}
+
+// ---------- Saneamiento: los datos vienen de localStorage o de un archivo, no se confía en su forma
+
+function sanearMovimiento(m: unknown): Movimiento | null {
+  const x = m as Partial<Movimiento>
+  if (!x || (x.tipo !== 'venta' && x.tipo !== 'abono')) return null
+  const monto = Number(x.monto)
+  if (!(monto > 0)) return null
+  return {
+    id: String(x.id ?? 'mov_' + Math.random().toString(36).slice(2)),
+    tipo: x.tipo,
+    descripcion: String(x.descripcion ?? ''),
+    monto,
+    fecha: String(x.fecha ?? ''),
+  }
+}
+
+export function sanearClientes(lista: unknown): Cliente[] | null {
+  if (!Array.isArray(lista)) return null
+  return lista
+    .filter((c) => c && typeof c === 'object' && (c as Cliente).nombre)
+    .map((c: Cliente) => ({
+      id: String(c.id),
+      nombre: String(c.nombre),
+      telefono: String(c.telefono ?? '').replace(/\D/g, ''),
+      nota: String(c.nota ?? ''),
+      movimientos: (Array.isArray(c.movimientos) ? c.movimientos : [])
+        .map(sanearMovimiento)
+        .filter((m): m is Movimiento => m !== null),
+    }))
+}
+
+export function sanearCatalogo(lista: unknown): Producto[] | null {
+  if (!Array.isArray(lista)) return null
+  return lista
+    .filter((p) => p && (p as Producto).nombre && Number((p as Producto).precio) > 0)
+    .map((p: Producto) => ({ nombre: String(p.nombre), precio: Number(p.precio) }))
+}
+
+export function sanearMetodos(lista: unknown): MetodoPago[] | null {
+  if (!Array.isArray(lista)) return null
+  return lista
+    .filter((m) => m && esTipoPago((m as MetodoPago).tipo))
+    .map((m: MetodoPago) => ({
+      id: String(m.id),
+      tipo: m.tipo,
+      datos: Object.fromEntries(Object.entries(m.datos ?? {}).map(([k, v]) => [k, String(v ?? '')])),
+      activo: m.activo !== false,
+    }))
+}
+
+export function sanearNegocio(n: unknown): Negocio | null {
+  const x = n as Partial<Negocio>
+  if (!x || !x.nombre || !esCodigoPais(x.pais)) return null
+  return { nombre: String(x.nombre), pais: x.pais }
+}
+
+function sanearBCV(b: unknown): ConfigBCV {
+  const x = (b ?? {}) as Partial<ConfigBCV>
+  return { tasa: Number(x.tasa) > 0 ? Number(x.tasa) : 0, actualizado: String(x.actualizado ?? '') }
+}
+
+/**
+ * Carga todo lo guardado. Si encuentra datos del formato viejo de Pago Móvil y aún no hay
+ * métodos de pago, los convierte y guarda el resultado.
+ */
+export function cargarEstado(almacen: Almacen): EstadoGuardado {
+  const datos = leerJSON(almacen, CLAVES.clientes) as { clientes?: unknown } | null
+
+  let metodos = sanearMetodos(leerJSON(almacen, CLAVES.metodos))
+  if (metodos === null) {
+    metodos = migrarPagoMovil(leerJSON(almacen, CLAVES.pagoMovilAntiguo) as PagoMovilAntiguo | null)
+    if (metodos.length) guardarJSON(almacen, CLAVES.metodos, metodos)
+  }
+
+  return {
+    clientes: sanearClientes(datos?.clientes) ?? [],
+    catalogo: sanearCatalogo(leerJSON(almacen, CLAVES.catalogo)) ?? CATALOGO_PREDETERMINADO.map((p) => ({ ...p })),
+    metodos,
+    negocio: sanearNegocio(leerJSON(almacen, CLAVES.negocio)) ?? { ...NEGOCIO_PREDETERMINADO },
+    bcv: sanearBCV(leerJSON(almacen, CLAVES.bcv)),
+  }
+}
+
+/** Guarda una parte del estado con la forma exacta que espera la versión anterior */
+export const guardar = {
+  clientes: (a: Almacen, clientes: Cliente[]) => guardarJSON(a, CLAVES.clientes, { clientes }),
+  catalogo: (a: Almacen, catalogo: Producto[]) => guardarJSON(a, CLAVES.catalogo, catalogo),
+  metodos: (a: Almacen, metodos: MetodoPago[]) => guardarJSON(a, CLAVES.metodos, metodos),
+  negocio: (a: Almacen, negocio: Negocio) => guardarJSON(a, CLAVES.negocio, negocio),
+  bcv: (a: Almacen, bcv: ConfigBCV) => guardarJSON(a, CLAVES.bcv, bcv),
+}
+
+export function leerUltimoMetodo(a: Almacen): string {
+  try {
+    return a.getItem(CLAVES.ultimoMetodo) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+export function recordarUltimoMetodo(a: Almacen, nombre: string): void {
+  try {
+    a.setItem(CLAVES.ultimoMetodo, nombre)
+  } catch {
+    // sin almacenamiento: solo se pierde la preferencia
+  }
+}
