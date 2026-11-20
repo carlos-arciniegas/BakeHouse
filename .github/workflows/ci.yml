@@ -1,0 +1,83 @@
+name: Pruebas y publicación
+
+# En cada push y pull request se corren todas las pruebas.
+# Solo un push a main que pase todo se publica en GitHub Pages.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+# Un solo despliegue a la vez; uno nuevo cancela al que estaba en curso en la misma rama
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pruebas:
+    name: Lint, tipos y pruebas
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Lint (oxlint)
+        run: npm run lint
+
+      - name: Tipos (TypeScript)
+        run: npm run typecheck
+
+      - name: Pruebas unitarias (Vitest)
+        run: npm test
+
+      - name: Instalar Chromium para Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Pruebas de punta a punta (Playwright, móvil y escritorio)
+        run: npm run test:e2e
+
+      - name: Guardar el reporte de Playwright si algo falla
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: reporte-playwright
+          path: playwright-report/
+          retention-days: 14
+
+      # Playwright ya compiló la app en dist/; se sube solo si se va a publicar
+      - name: Preparar Pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/configure-pages@v6
+
+      - name: Subir la app compilada
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: dist
+
+  publicar:
+    name: Publicar en GitHub Pages
+    needs: pruebas
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.despliegue.outputs.page_url }}
+    steps:
+      - name: Publicar
+        id: despliegue
+        uses: actions/deploy-pages@v5
