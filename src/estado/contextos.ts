@@ -67,6 +67,8 @@ export interface OpcionesAviso {
   error?: boolean
   /** Botón dentro del aviso, por ejemplo "Deshacer" */
   accion?: { texto: string; fn: () => void }
+  /** No desaparece solo: se queda hasta que se usa su botón */
+  fijo?: boolean
 }
 
 export type Avisar = (mensaje: string, opciones?: OpcionesAviso) => void

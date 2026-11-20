@@ -20,7 +20,7 @@ export function ProveedorAvisos({ children }: { children: ReactNode }) {
   const avisar = useCallback<Avisar>((mensaje, opciones = {}) => {
     const id = ++siguiente.current
     setAvisos((lista) => [...lista, { id, mensaje, saliendo: false, ...opciones }])
-    setTimeout(() => quitar(id), opciones.accion ? 5000 : 2600)
+    if (!opciones.fijo) setTimeout(() => quitar(id), opciones.accion ? 5000 : 2600)
   }, [quitar])
 
   return (

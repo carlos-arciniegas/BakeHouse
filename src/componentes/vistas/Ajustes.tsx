@@ -7,6 +7,7 @@ import type { CodigoPais } from '../../logica/tipos'
 import { useAvisos, useTienda, useUI } from '../../estado/contextos'
 import { Icono } from '../base'
 import { useClienteEjemplo, useSincronizarBCV } from '../ganchos'
+import { useInstalarApp } from '../instalar'
 
 function FormularioNegocio() {
   const { estado, despachar, pais } = useTienda()
@@ -63,6 +64,33 @@ function FormularioNegocio() {
         </div>
         <div><button type="submit" className="boton boton--primario">Guardar cambios</button></div>
       </form>
+    </section>
+  )
+}
+
+/** Solo aparece si se puede instalar y todavía no se está usando como app */
+function SeccionInstalar() {
+  const { puedeInstalar, esIOS, instalada, instalar } = useInstalarApp()
+  const avisar = useAvisos()
+  if (instalada || (!puedeInstalar && !esIOS)) return null
+
+  const alInstalar = async () => {
+    if (await instalar()) avisar('App instalada en tu pantalla de inicio')
+  }
+
+  return (
+    <section className="seccion">
+      <h2>Instalar en el teléfono</h2>
+      {puedeInstalar ? (
+        <>
+          <p>Ábrela desde la pantalla de inicio, como cualquier otra app. Funciona aunque no tengas conexión.</p>
+          <div className="seccion__acciones">
+            <button type="button" className="boton boton--oscuro" onClick={alInstalar}>Instalar app</button>
+          </div>
+        </>
+      ) : (
+        <p>En iPhone: toca <b>Compartir</b> en Safari y luego <b>Agregar a inicio</b>. Funciona aunque no tengas conexión.</p>
+      )}
     </section>
   )
 }
@@ -142,6 +170,7 @@ export function Ajustes() {
 
       <div className="panel">
         <FormularioNegocio key={estado.negocio.nombre + estado.negocio.pais} />
+        <SeccionInstalar />
 
         <section className="seccion">
           <h2>Copia de seguridad</h2>

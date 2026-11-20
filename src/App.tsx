@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import './estilos/app.css'
+import { ActualizacionPWA } from './componentes/ActualizacionPWA'
 import { ProveedorAvisos } from './componentes/Avisos'
 import { Hoja } from './componentes/base'
 import { useSincronizarBCV } from './componentes/ganchos'
@@ -88,6 +89,7 @@ function Aplicacion() {
         {vista === 'ajustes' && <Ajustes />}
       </main>
       <Hojas />
+      <ActualizacionPWA />
     </div>
   )
 }
