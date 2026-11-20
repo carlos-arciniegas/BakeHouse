@@ -12,7 +12,8 @@
     "test:watch": "vitest",
     "lint": "oxlint",
     "typecheck": "tsc -b",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:bd": "bash scripts/probar-bd.sh"
   },
   "dependencies": {
     "react": "^19.3.1",

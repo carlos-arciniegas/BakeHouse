@@ -21,6 +21,7 @@ App web (PWA) para que negocios de repostería y emprendimientos lleven el contr
   - Pruebas junto a cada módulo (`*.test.ts`) con Vitest.
 - Convenciones de React: los archivos `.tsx` exportan solo componentes (hooks y contextos van en `.ts`); para reaccionar a un cambio de prop se usa el patrón de estado previo durante el render, no `setState` dentro de `useEffect`; `useEffect` solo para sistemas externos (red, DOM, temporizadores).
 - Comandos: `npm run dev`, `npm test` (Vitest), `npm run test:e2e` (Playwright, móvil y escritorio contra la app compilada), `npm run typecheck`, `npm run lint`, `npm run build`. Antes de dar algo por terminado deben pasar `npm test`, `npm run test:e2e`, `npm run typecheck` y `npm run lint`.
+- Supabase (en preparación, ver `docs/plan-supabase.md`): migraciones en `supabase/migrations/`, pruebas de seguridad en `supabase/pruebas/` con `npm run test:bd` (PostgreSQL desechable en Docker). Todo cambio de esquema va en una migración nueva con su prueba. Nunca poner la clave secreta (service_role) ni la contraseña de la base en la app o en el repo.
 - Pruebas de punta a punta en `e2e/`: abren la app con datos de prueba (`abrirConDatos`) y simulan la tasa BCV en 100 Bs/$. Cada flujo nuevo o cambiado de la interfaz debe tener su prueba ahí; usar localizadores accesibles (`getByRole`, `getByLabel`).
 - Toda lógica nueva va en `src/logica/` o `src/datos/` con su prueba; los componentes solo muestran y llaman a esas funciones.
 - Los datos se guardan solo en `localStorage` del navegador.
