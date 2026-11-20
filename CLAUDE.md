@@ -10,11 +10,15 @@ App web (PWA) para que negocios de repostería y emprendimientos lleven el contr
 
 ## Estado actual
 
-- **Migración en curso a React + TypeScript + Vite** (rama `react`). La versión completa de un solo archivo sigue en `legacy/index.html` como referencia de comportamiento y diseño; se borra cuando la interfaz en React la reemplace.
+- **React 19 + TypeScript + Vite** (rama `react`). `legacy/index.html` es la versión anterior de un solo archivo; queda como referencia hasta borrarla.
 - Estructura:
   - `src/logica/`: funciones puras del dominio (saldo, moneda, teléfonos, países, métodos de pago, mensajes de WhatsApp, venta, BCV). Sin DOM ni `localStorage`; todo lo que necesitan entra por parámetro.
   - `src/datos/`: `localStorage` (claves, carga, migraciones y saneamiento) y respaldos JSON/CSV. Reciben el almacenamiento por parámetro para poder probarse.
+  - `src/estado/`: `reductor.ts` (todo cambio de datos es una acción; puro y probado), `contextos.ts` (contextos y hooks `useTienda`, `useUI`, `useAvisos`), y los proveedores `Tienda.tsx` (guarda en `localStorage` la parte que cambió) y `UI.tsx` (vista, hoja abierta, confirmación, cliente resaltado).
+  - `src/componentes/`: `Marco.tsx` (barra, navegación, toldo), `vistas/` (Cuentas, Catálogo, Pagos, Ajustes), `hojas/` (cliente, venta, pago, método), `base.tsx` (Hoja, Interruptor, Icono, OpcionesPago), `ganchos.ts` (hooks y utilidades de la interfaz).
+  - `src/estilos/app.css`: el CSS de la versión anterior, con los mismos nombres de clase.
   - Pruebas junto a cada módulo (`*.test.ts`) con Vitest.
+- Convenciones de React: los archivos `.tsx` exportan solo componentes (hooks y contextos van en `.ts`); para reaccionar a un cambio de prop se usa el patrón de estado previo durante el render, no `setState` dentro de `useEffect`; `useEffect` solo para sistemas externos (red, DOM, temporizadores).
 - Comandos: `npm run dev`, `npm test`, `npm run typecheck`, `npm run lint`, `npm run build`. Antes de dar algo por terminado deben pasar `npm test`, `npm run typecheck` y `npm run lint`.
 - Toda lógica nueva va en `src/logica/` o `src/datos/` con su prueba; los componentes solo muestran y llaman a esas funciones.
 - Los datos se guardan solo en `localStorage` del navegador.
