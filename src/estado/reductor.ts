@@ -1,4 +1,5 @@
 import type { EstadoGuardado } from '../datos/almacenamiento'
+import { cambiarCantidadDia, reemplazarDia } from '../logica/inventario'
 import type { Cliente, ConfigBCV, MetodoPago, Movimiento, Negocio, Producto } from '../logica/tipos'
 
 /**
@@ -25,6 +26,8 @@ export type Accion =
   | { tipo: 'negocio/guardar'; negocio: Negocio }
   | { tipo: 'bcv/guardar'; bcv: ConfigBCV }
   | { tipo: 'mensajeCobro/guardar'; plantilla: string }
+  | { tipo: 'inventario/fijar'; fecha: string; productoId: string; cantidad: number }
+  | { tipo: 'inventario/reemplazar-dia'; fecha: string; cantidades: Record<string, number> }
   | { tipo: 'estado/reemplazar'; estado: EstadoGuardado }
 
 function conCliente(estado: EstadoGuardado, id: string, cambio: (c: Cliente) => Cliente): EstadoGuardado {
@@ -93,6 +96,10 @@ export function reductor(estado: EstadoGuardado, accion: Accion): EstadoGuardado
       return { ...estado, bcv: accion.bcv }
     case 'mensajeCobro/guardar':
       return { ...estado, mensajeCobro: accion.plantilla }
+    case 'inventario/fijar':
+      return { ...estado, inventario: cambiarCantidadDia(estado.inventario, accion.fecha, accion.productoId, accion.cantidad) }
+    case 'inventario/reemplazar-dia':
+      return { ...estado, inventario: reemplazarDia(estado.inventario, accion.fecha, accion.cantidades) }
     case 'estado/reemplazar':
       return accion.estado
   }

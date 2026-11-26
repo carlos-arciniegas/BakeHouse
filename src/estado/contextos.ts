@@ -23,7 +23,7 @@ export function useTienda(): ValorTienda {
 
 // ---------- Interfaz ----------
 
-export type Vista = 'cuentas' | 'catalogo' | 'pagos' | 'ajustes'
+export type Vista = 'cuentas' | 'inventario' | 'catalogo' | 'pagos' | 'ajustes'
 
 /** Qué hoja (modal) está abierta y con qué datos */
 export type Hoja =

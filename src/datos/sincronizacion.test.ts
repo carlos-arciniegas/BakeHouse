@@ -23,6 +23,7 @@ const base: EstadoGuardado = {
   negocio: { nombre: "Pachon's Bakehouse", pais: 'VE' },
   bcv: { tasa: 100, actualizado: 'BCV' },
   mensajeCobro: '',
+  inventario: {},
 }
 
 const resumen = (r: ReturnType<typeof diferencias>) => r.cambios.map((c) => ('borrar' in c ? '-' : '+') + c.tabla + '/' + c.id)

@@ -1,6 +1,7 @@
 import { useRef, useState, type FormEvent } from 'react'
 import { leerUltimoMetodo, recordarUltimoMetodo } from '../../datos/almacenamiento'
 import { fechaHoy } from '../../logica/fechas'
+import { mapaDisponiblesDia } from '../../logica/inventario'
 import { opcionesDePago } from '../../logica/metodosPago'
 import { convertirABolivares, formatearBolivares, formatearMoneda, nombreMoneda, redondear, tasaActiva } from '../../logica/moneda'
 import { calcularResumenCliente, estadoSaldo } from '../../logica/saldo'
@@ -35,6 +36,7 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
   const saldo = cliente ? calcularResumenCliente(cliente).saldo : 0
   const montoNum = parseFloat(monto) || 0
   const haySeleccion = Object.keys(seleccion).length > 0
+  const disponibles = mapaDisponiblesDia(estado.catalogo, estado.clientes, estado.inventario, fecha)
 
   // Tocar un producto suma uno y "−" resta uno; la descripción y el total se arman solos
   const cambiarSeleccion = (nueva: Seleccion) => {
@@ -129,6 +131,9 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
           {estado.catalogo.length === 0 && <p className="ayuda">El catálogo está vacío. Escribe la venta a mano o agrega productos en Catálogo.</p>}
           {estado.catalogo.map((p, i) => {
             const cantidad = seleccion[i] ?? 0
+            const stock = disponibles[p.id]
+            const quedan = stock ? stock.quedan - cantidad : null
+            const etiquetaStock = quedan === null ? '' : quedan <= 0 ? 'Agotado' : `Quedan ${quedan}`
             return (
               <span key={p.id} className="chip-grupo">
                 {cantidad > 0 && (
@@ -137,9 +142,12 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
                   </button>
                 )}
                 <button type="button" className="chip" aria-pressed={cantidad > 0}
-                  aria-label={cantidad > 0 ? `${p.nombre}, ${cantidad} seleccionados. Toca para sumar uno` : p.nombre}
+                  aria-label={[p.nombre, cantidad > 0 ? `${cantidad} seleccionados. Toca para sumar uno` : '', etiquetaStock].filter(Boolean).join(', ')}
                   onClick={() => cambiarSeleccion(sumarProducto(seleccion, i))}>
                   {p.nombre} <b>{formatearMoneda(p.precio, pais)}</b>
+                  {quedan !== null && (
+                    <span className={'chip__stock' + (quedan <= 0 ? ' chip__stock--agotado' : '')}>{etiquetaStock}</span>
+                  )}
                   {cantidad > 0 && <span key={cantidad} className="chip__cant chip__cant--pop">{cantidad}</span>}
                 </button>
               </span>

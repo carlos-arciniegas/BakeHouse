@@ -16,6 +16,7 @@ describe('cargarEstado', () => {
     expect(estado.negocio).toEqual({ nombre: "Pachon's Bakehouse", pais: 'VE' })
     expect(estado.bcv).toEqual({ tasa: 0, actualizado: '' })
     expect(estado.mensajeCobro).toBe('')
+    expect(estado.inventario).toEqual({})
   })
 
   it('lee los datos con el formato de la versión anterior', () => {
@@ -113,5 +114,17 @@ describe('guardar', () => {
 
     almacen.datos.set(CLAVES.mensajeCobro, JSON.stringify(123))
     expect(cargarEstado(almacen).mensajeCobro).toBe('')
+  })
+
+  it('guarda y sanea el inventario diario descartando fechas o cantidades inválidas', () => {
+    const almacen = memoria()
+    guardar.inventario(almacen, { '2026-11-26': { prod_base_1: 12 } })
+    expect(cargarEstado(almacen).inventario).toEqual({ '2026-11-26': { prod_base_1: 12 } })
+
+    almacen.datos.set(CLAVES.inventario, JSON.stringify({
+      mala_fecha: { prod_base_1: 5 },
+      '2026-11-26': { prod_base_1: 8.7, prod_base_2: 0, prod_base_3: -2 },
+    }))
+    expect(cargarEstado(almacen).inventario).toEqual({ '2026-11-26': { prod_base_1: 8 } })
   })
 })

@@ -56,6 +56,7 @@ export function Barra() {
 
 const SECCIONES: { vista: Vista; icono: NombreIcono; etiqueta: string; etiquetaLarga?: string }[] = [
   { vista: 'cuentas', icono: 'libreta', etiqueta: 'Cuentas' },
+  { vista: 'inventario', icono: 'caja', etiqueta: 'Inventario' },
   { vista: 'catalogo', icono: 'galleta', etiqueta: 'Catálogo' },
   { vista: 'pagos', icono: 'tarjeta', etiqueta: 'Pagos', etiquetaLarga: 'Métodos de pago' },
   { vista: 'ajustes', icono: 'ajustes', etiqueta: 'Ajustes' },

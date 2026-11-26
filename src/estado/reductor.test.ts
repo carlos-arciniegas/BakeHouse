@@ -13,6 +13,7 @@ const inicial: EstadoGuardado = {
   negocio: { nombre: 'Pachon\'s', pais: 'VE' },
   bcv: { tasa: 0, actualizado: '' },
   mensajeCobro: '',
+  inventario: {},
 }
 
 describe('reductor', () => {
@@ -66,5 +67,16 @@ describe('reductor', () => {
   it('guarda la plantilla personalizada del mensaje de cobro', () => {
     const e = reductor(inicial, { tipo: 'mensajeCobro/guardar', plantilla: 'Hola {cliente}, debes {saldo}' })
     expect(e.mensajeCobro).toBe('Hola {cliente}, debes {saldo}')
+  })
+
+  it('fija y reemplaza el inventario diario', () => {
+    let e = reductor(inicial, { tipo: 'inventario/fijar', fecha: '2026-11-26', productoId: 'p1', cantidad: 12 })
+    expect(e.inventario).toEqual({ '2026-11-26': { p1: 12 } })
+
+    e = reductor(e, { tipo: 'inventario/fijar', fecha: '2026-11-26', productoId: 'p1', cantidad: 0 })
+    expect(e.inventario).toEqual({})
+
+    e = reductor(e, { tipo: 'inventario/reemplazar-dia', fecha: '2026-11-26', cantidades: { p1: 5, p2: 3 } })
+    expect(e.inventario).toEqual({ '2026-11-26': { p1: 5, p2: 3 } })
   })
 })

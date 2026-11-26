@@ -18,6 +18,7 @@ function estadoCon(clientes: number, movimientosPorCliente: number): EstadoGuard
     negocio: { nombre: "Pachon's Bakehouse", pais: 'VE' },
     bcv: { tasa: 100, actualizado: 'BCV' },
     mensajeCobro: '',
+    inventario: {},
   }
 }
 

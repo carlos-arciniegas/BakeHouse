@@ -104,3 +104,50 @@ test('mensaje de cobro: se edita en Pagos, se ve en la vista previa, llega a Wha
   await page.getByRole('button', { name: 'Deshacer' }).click()
   await expect(campo).toHaveValue(plantilla)
 })
+
+test('historial de pagos: muestra cliente, método y monto, y filtra por fechas', async ({ page }) => {
+  await ir(page, 'Pagos')
+  await page.getByRole('group', { name: 'Secciones de pagos' }).getByRole('button', { name: 'Historial' }).click()
+
+  const filas = page.locator('.pago-fila')
+  await expect(filas).toHaveCount(2)
+  await expect(filas.nth(0)).toContainText('María Fernanda Pérez')
+  await expect(filas.nth(0)).toContainText('18/11/26')
+  await expect(filas.nth(0)).toContainText('Pago Móvil')
+  await expect(filas.nth(0)).toContainText('$2,00')
+  await expect(filas.nth(0)).toContainText('Bs. 490,00')
+  await expect(filas.nth(1)).toContainText('Andreína Salas')
+  await expect(filas.nth(1)).toContainText('09/11/26')
+  await expect(filas.nth(1)).toContainText('Efectivo $')
+  await expect(filas.nth(1)).toContainText('$3,50')
+
+  const resumen = page.getByLabel('Resumen de pagos')
+  await expect(resumen).toContainText('$5,50')
+  await expect(resumen).toContainText('2 pagos')
+
+  await page.getByLabel('Desde').fill('2026-11-15')
+  await page.getByLabel('Hasta').fill('2026-11-20')
+  await expect(filas).toHaveCount(1)
+  await expect(filas.first()).toContainText('María Fernanda Pérez')
+  await expect(resumen).toContainText('$2,00')
+  await expect(resumen).toContainText('1 pago')
+
+  await page.getByRole('button', { name: 'Limpiar filtros' }).click()
+  await expect(filas).toHaveCount(2)
+
+  await page.getByLabel('Método').selectOption('Efectivo $')
+  await expect(filas).toHaveCount(1)
+  await expect(filas.first()).toContainText('Andreína Salas')
+
+  await ir(page, 'Cuentas')
+  await fila(page, 'José Rodríguez').getByRole('button', { name: 'Pago', exact: true }).click()
+  await page.getByRole('button', { name: 'Registrar pago' }).click()
+
+  await ir(page, 'Pagos')
+  await page.getByRole('group', { name: 'Secciones de pagos' }).getByRole('button', { name: 'Historial' }).click()
+  await page.getByRole('group', { name: 'Atajos de fecha' }).getByRole('button', { name: 'Hoy' }).click()
+  await expect(filas).toHaveCount(1)
+  await expect(filas.first()).toContainText('José Rodríguez')
+  await expect(filas.first()).toContainText('Pago Móvil')
+  await expect(filas.first()).toContainText('$11,00')
+})

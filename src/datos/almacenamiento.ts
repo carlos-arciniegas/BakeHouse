@@ -1,6 +1,6 @@
 import { esTipoPago, migrarPagoMovil, type PagoMovilAntiguo } from '../logica/metodosPago'
 import { esCodigoPais, NEGOCIO_PREDETERMINADO } from '../logica/paises'
-import type { Cliente, ConfigBCV, LineaVenta, MetodoPago, Movimiento, Negocio, Producto } from '../logica/tipos'
+import type { Cliente, ConfigBCV, InventarioDiario, LineaVenta, MetodoPago, Movimiento, Negocio, Producto } from '../logica/tipos'
 
 /**
  * Claves de localStorage. Empiezan por "pachons_" porque así las creó la primera versión;
@@ -15,6 +15,7 @@ export const CLAVES = {
   negocio: 'pachons_negocio_v1',
   ultimoMetodo: 'pachons_ultimo_metodo_v1',
   mensajeCobro: 'pachons_mensaje_cobro_v1',
+  inventario: 'pachons_inventario_v1',
 } as const
 
 export const CATALOGO_PREDETERMINADO: Producto[] = [
@@ -33,6 +34,7 @@ export interface EstadoGuardado {
   negocio: Negocio
   bcv: ConfigBCV
   mensajeCobro: string
+  inventario: InventarioDiario
 }
 
 /** Lo mínimo de Storage que se usa; permite probar con un almacenamiento en memoria */
@@ -133,6 +135,23 @@ function sanearMensajeCobro(valor: unknown): string {
   return typeof valor === 'string' ? valor : ''
 }
 
+const FECHA_ISO = /^\d{4}-\d{2}-\d{2}$/
+
+export function sanearInventario(valor: unknown): InventarioDiario {
+  if (!valor || typeof valor !== 'object' || Array.isArray(valor)) return {}
+  const limpio: InventarioDiario = {}
+  for (const [fecha, mapa] of Object.entries(valor as Record<string, unknown>)) {
+    if (!FECHA_ISO.test(fecha) || !mapa || typeof mapa !== 'object' || Array.isArray(mapa)) continue
+    const dia: Record<string, number> = {}
+    for (const [id, cant] of Object.entries(mapa as Record<string, unknown>)) {
+      const n = Math.floor(Number(cant))
+      if (id && Number.isFinite(n) && n > 0) dia[id] = n
+    }
+    if (Object.keys(dia).length > 0) limpio[fecha] = dia
+  }
+  return limpio
+}
+
 /**
  * Carga todo lo guardado. Si encuentra datos del formato viejo de Pago Móvil y aún no hay
  * métodos de pago, los convierte y guarda el resultado.
@@ -160,6 +179,7 @@ export function cargarEstado(almacen: Almacen): EstadoGuardado {
     negocio: sanearNegocio(leerJSON(almacen, CLAVES.negocio)) ?? { ...NEGOCIO_PREDETERMINADO },
     bcv: sanearBCV(leerJSON(almacen, CLAVES.bcv)),
     mensajeCobro: sanearMensajeCobro(leerJSON(almacen, CLAVES.mensajeCobro)),
+    inventario: sanearInventario(leerJSON(almacen, CLAVES.inventario)),
   }
 }
 
@@ -171,6 +191,7 @@ export const guardar = {
   negocio: (a: Almacen, negocio: Negocio) => guardarJSON(a, CLAVES.negocio, negocio),
   bcv: (a: Almacen, bcv: ConfigBCV) => guardarJSON(a, CLAVES.bcv, bcv),
   mensajeCobro: (a: Almacen, mensajeCobro: string) => guardarJSON(a, CLAVES.mensajeCobro, mensajeCobro),
+  inventario: (a: Almacen, inventario: InventarioDiario) => guardarJSON(a, CLAVES.inventario, inventario),
 }
 
 export function leerUltimoMetodo(a: Almacen): string {

@@ -1,9 +1,139 @@
 import { useRef, useState, type FormEvent } from 'react'
+import { fechaHoy, formatearFechaCorta } from '../../logica/fechas'
+import { extraerPagos, filtrarPagos, metodosEnHistorial, rangoFechas, type RangoRapido } from '../../logica/historialPagos'
 import { construirBloquePagos, nombreMetodo, resumenMetodo } from '../../logica/metodosPago'
+import { convertirABolivares, formatearBolivares, formatearMoneda, tasaActiva } from '../../logica/moneda'
 import { CLIENTE_VISTA_PREVIA, mensajeCobro, PLANTILLA_COBRO_PREDETERMINADA, VARIABLES_COBRO } from '../../logica/whatsapp'
 import { useAvisos, useTienda, useUI } from '../../estado/contextos'
 import { Icono, Interruptor } from '../base'
 import { copiarTexto } from '../ganchos'
+
+const ATAJOS: { id: RangoRapido; etiqueta: string }[] = [
+  { id: 'todos', etiqueta: 'Todos' },
+  { id: 'hoy', etiqueta: 'Hoy' },
+  { id: 'semana', etiqueta: '7 días' },
+  { id: 'mes', etiqueta: 'Este mes' },
+]
+
+function HistorialPagos() {
+  const { estado, pais } = useTienda()
+  const hoy = fechaHoy()
+  const todos = extraerPagos(estado.clientes)
+  const metodos = metodosEnHistorial(todos)
+
+  const [desde, setDesde] = useState('')
+  const [hasta, setHasta] = useState('')
+  const [metodo, setMetodo] = useState('')
+
+  const resumen = filtrarPagos(todos, desde, hasta, metodo)
+  const conTasa = tasaActiva(pais, estado.bcv.tasa)
+  const moneda = (n: number) => formatearMoneda(n, pais)
+
+  return (
+    <div>
+      <div className="pagos-filtros">
+        <div className="chips" role="group" aria-label="Atajos de fecha">
+          {ATAJOS.map((a) => {
+            const r = rangoFechas(a.id, hoy)
+            const activo = desde === r.desde && hasta === r.hasta
+            return (
+              <button
+                key={a.id}
+                type="button"
+                className="chip"
+                aria-pressed={activo}
+                onClick={() => { setDesde(r.desde); setHasta(r.hasta) }}
+              >
+                {a.etiqueta}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="dos">
+          <div className="campo">
+            <label htmlFor="pagosDesde" className="campo__etq">Desde</label>
+            <input id="pagosDesde" type="date" className="entrada" value={desde} onChange={(e) => setDesde(e.target.value)} />
+          </div>
+          <div className="campo">
+            <label htmlFor="pagosHasta" className="campo__etq">Hasta</label>
+            <input id="pagosHasta" type="date" className="entrada" value={hasta} onChange={(e) => setHasta(e.target.value)} />
+          </div>
+        </div>
+
+        {(metodos.length >= 2 || desde || hasta || metodo) && (
+          <div className="pagos-filtros__fila">
+            {metodos.length >= 2 && (
+              <div className="campo pagos-filtros__metodo">
+                <label htmlFor="pagosMetodo" className="campo__etq">Método</label>
+                <select id="pagosMetodo" className="entrada" value={metodo} onChange={(e) => setMetodo(e.target.value)}>
+                  <option value="">Todos los métodos</option>
+                  {metodos.map((m) => <option key={m} value={m}>{m}</option>)}
+                </select>
+              </div>
+            )}
+            {(desde || hasta || metodo) && (
+              <button type="button" className="boton boton--texto" onClick={() => { setDesde(''); setHasta(''); setMetodo('') }}>
+                Limpiar filtros
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {resumen.pagos.length > 0 && (
+        <div className="pagos-resumen" aria-label="Resumen de pagos">
+          <div className="pagos-resumen__cabeza">
+            <div>
+              <span className="pagos-resumen__etq">Total cobrado</span>
+              <strong className="pagos-resumen__total">{moneda(resumen.total)}</strong>
+              {conTasa && (
+                <span className="pagos-resumen__bs">{formatearBolivares(convertirABolivares(resumen.total, estado.bcv.tasa))}</span>
+              )}
+            </div>
+            <span className="pagos-resumen__conteo">
+              {resumen.pagos.length === 1 ? '1 pago' : resumen.pagos.length + ' pagos'}
+            </span>
+          </div>
+          <p className="pagos-resumen__desglose">
+            {resumen.porMetodo.map((m) => m.metodo + ': ' + moneda(m.total)).join(' · ')}
+          </p>
+        </div>
+      )}
+
+      <div className="panel">
+        <div className="panel__cabeza">
+          <h2>Pagos recibidos <span className="contador">{resumen.pagos.length}</span></h2>
+        </div>
+        {todos.length === 0 ? (
+          <p className="lista-vacia">Todavía no hay pagos registrados.</p>
+        ) : resumen.pagos.length === 0 ? (
+          <p className="lista-vacia">No hay pagos en las fechas seleccionadas.</p>
+        ) : (
+          resumen.pagos.map((p) => (
+            <div key={p.id} className="pago-fila">
+              <div className="pago-fila__info">
+                <span className="pago-fila__cliente">{p.clienteNombre}</span>
+                <span className="pago-fila__meta">
+                  <span>{formatearFechaCorta(p.fecha)}</span>
+                  <span className="pago-fila__metodo">{p.metodo}</span>
+                </span>
+              </div>
+              <div className="pago-fila__monto">
+                <strong>{moneda(p.monto)}</strong>
+                {p.detalleBs ? (
+                  <span className="pago-fila__bs">{p.detalleBs}</span>
+                ) : conTasa ? (
+                  <span className="pago-fila__bs">{formatearBolivares(convertirABolivares(p.monto, estado.bcv.tasa))}</span>
+                ) : null}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
 
 function EditorMensajeCobro() {
   const { estado, despachar, pais } = useTienda()
@@ -107,6 +237,7 @@ export function Pagos() {
   const { estado, despachar } = useTienda()
   const { abrirHoja } = useUI()
   const avisar = useAvisos()
+  const [pestana, setPestana] = useState<'metodos' | 'historial'>('metodos')
   const bloque = construirBloquePagos(estado.metodos)
 
   const alternar = (id: string, activo: boolean) => {
@@ -140,49 +271,62 @@ export function Pagos() {
         <p>Las formas en que tus clientes te pueden pagar. Las que dejes activadas se agregan al final de cada cobro que envías por WhatsApp.</p>
       </header>
 
-      <div className="columnas columnas--pm">
-        <div className="panel">
-          <div className="panel__cabeza">
-            <h2>Tus métodos <span className="contador">{estado.metodos.length}</span></h2>
-            <button type="button" className="boton boton--primario boton--chico" onClick={() => abrirHoja({ tipo: 'metodo' })}>
-              <Icono nombre="mas" chico />Agregar
-            </button>
-          </div>
-          {estado.metodos.length === 0 && (
-            <p className="lista-vacia">Todavía no tienes métodos de pago. Agrega el primero para incluirlo en tus cobros.</p>
-          )}
-          {estado.metodos.map((m) => {
-            const nombre = nombreMetodo(m)
-            return (
-              <div key={m.id} className={'metodo' + (m.activo ? '' : ' metodo--inactivo')}>
-                <div className="metodo__info">
-                  <span className="metodo__nombre">{nombre}</span>
-                  <span className="metodo__datos">{resumenMetodo(m)}</span>
-                </div>
-                <Interruptor activo={m.activo} alCambiar={(v) => alternar(m.id, v)} etiquetaOculta={'Incluir ' + nombre + ' en los cobros'} />
-                <button type="button" className="icono-boton" aria-label={'Editar ' + nombre} onClick={() => abrirHoja({ tipo: 'metodo', id: m.id })}>
-                  <Icono nombre="lapiz" chico />
-                </button>
-                <button type="button" className="icono-boton icono-boton--peligro" aria-label={'Eliminar ' + nombre} onClick={() => eliminar(m.id)}>
-                  <Icono nombre="papelera" chico />
-                </button>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="panel">
-          <div className="panel__cabeza">
-            <h2>Así se ve en WhatsApp</h2>
-            <button type="button" className="boton boton--texto" onClick={copiar}><Icono nombre="copiar" chico />Copiar</button>
-          </div>
-          <div className="chat">
-            <div className="burbuja">{bloque || 'Activa al menos un método para que aparezca aquí.'}</div>
-          </div>
+      <div className="filtros pagos-pestanas">
+        <div className="segmento" role="group" aria-label="Secciones de pagos">
+          <button type="button" aria-pressed={pestana === 'metodos'} onClick={() => setPestana('metodos')}>Métodos</button>
+          <button type="button" aria-pressed={pestana === 'historial'} onClick={() => setPestana('historial')}>Historial</button>
         </div>
       </div>
 
-      <EditorMensajeCobro />
+      {pestana === 'historial' ? (
+        <HistorialPagos />
+      ) : (
+        <>
+          <div className="columnas columnas--pm">
+            <div className="panel">
+              <div className="panel__cabeza">
+                <h2>Tus métodos <span className="contador">{estado.metodos.length}</span></h2>
+                <button type="button" className="boton boton--primario boton--chico" onClick={() => abrirHoja({ tipo: 'metodo' })}>
+                  <Icono nombre="mas" chico />Agregar
+                </button>
+              </div>
+              {estado.metodos.length === 0 && (
+                <p className="lista-vacia">Todavía no tienes métodos de pago. Agrega el primero para incluirlo en tus cobros.</p>
+              )}
+              {estado.metodos.map((m) => {
+                const nombre = nombreMetodo(m)
+                return (
+                  <div key={m.id} className={'metodo' + (m.activo ? '' : ' metodo--inactivo')}>
+                    <div className="metodo__info">
+                      <span className="metodo__nombre">{nombre}</span>
+                      <span className="metodo__datos">{resumenMetodo(m)}</span>
+                    </div>
+                    <Interruptor activo={m.activo} alCambiar={(v) => alternar(m.id, v)} etiquetaOculta={'Incluir ' + nombre + ' en los cobros'} />
+                    <button type="button" className="icono-boton" aria-label={'Editar ' + nombre} onClick={() => abrirHoja({ tipo: 'metodo', id: m.id })}>
+                      <Icono nombre="lapiz" chico />
+                    </button>
+                    <button type="button" className="icono-boton icono-boton--peligro" aria-label={'Eliminar ' + nombre} onClick={() => eliminar(m.id)}>
+                      <Icono nombre="papelera" chico />
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="panel">
+              <div className="panel__cabeza">
+                <h2>Así se ve en WhatsApp</h2>
+                <button type="button" className="boton boton--texto" onClick={copiar}><Icono nombre="copiar" chico />Copiar</button>
+              </div>
+              <div className="chat">
+                <div className="burbuja">{bloque || 'Activa al menos un método para que aparezca aquí.'}</div>
+              </div>
+            </div>
+          </div>
+
+          <EditorMensajeCobro />
+        </>
+      )}
     </section>
   )
 }

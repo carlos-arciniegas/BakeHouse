@@ -86,3 +86,6 @@ export interface ResumenCliente {
 }
 
 export type EstadoSaldo = 'debe' | 'favor' | 'al-dia'
+
+/** Unidades llevadas por fecha (AAAA-MM-DD) y id de producto */
+export type InventarioDiario = Record<string, Record<string, number>>

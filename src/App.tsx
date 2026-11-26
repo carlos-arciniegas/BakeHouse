@@ -13,6 +13,7 @@ import { useSincronizacion } from './componentes/sincronizacion'
 import { Ajustes } from './componentes/vistas/Ajustes'
 import { Catalogo } from './componentes/vistas/Catalogo'
 import { Cuentas } from './componentes/vistas/Cuentas'
+import { Inventario } from './componentes/vistas/Inventario'
 import { Pagos } from './componentes/vistas/Pagos'
 import { useTienda, useUI, type Confirmacion, type Hoja as HojaAbierta } from './estado/contextos'
 import { ProveedorTienda } from './estado/Tienda'
@@ -87,6 +88,7 @@ function Aplicacion() {
       {vista === 'cuentas' && <Toldo />}
       <main className="contenido">
         {vista === 'cuentas' && <Cuentas />}
+        {vista === 'inventario' && <Inventario />}
         {vista === 'catalogo' && <Catalogo />}
         {vista === 'pagos' && <Pagos />}
         {vista === 'ajustes' && <Ajustes />}

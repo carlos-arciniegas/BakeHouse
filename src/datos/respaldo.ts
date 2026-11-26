@@ -1,7 +1,7 @@
 import { migrarPagoMovil, type PagoMovilAntiguo } from '../logica/metodosPago'
 import { normalizarTelefono } from '../logica/telefono'
 import type { Cliente, Movimiento, Negocio, Pais } from '../logica/tipos'
-import { sanearCatalogo, sanearClientes, sanearMetodos, sanearNegocio, type EstadoGuardado } from './almacenamiento'
+import { sanearCatalogo, sanearClientes, sanearInventario, sanearMetodos, sanearNegocio, type EstadoGuardado } from './almacenamiento'
 
 /** El archivo .json que descarga "Descargar copia" */
 export function crearRespaldo(estado: EstadoGuardado) {
@@ -12,6 +12,7 @@ export function crearRespaldo(estado: EstadoGuardado) {
     negocio: estado.negocio,
     bcv: estado.bcv,
     mensajeCobro: estado.mensajeCobro,
+    inventario: estado.inventario,
   }
 }
 
@@ -41,6 +42,7 @@ export function leerRespaldo(texto: string, actual: EstadoGuardado): EstadoGuard
     negocio: sanearNegocio(datos.negocio) ?? actual.negocio,
     bcv: bcv && Number(bcv.tasa) > 0 ? { tasa: Number(bcv.tasa), actualizado: String(bcv.actualizado ?? '') } : actual.bcv,
     mensajeCobro: typeof datos.mensajeCobro === 'string' ? datos.mensajeCobro : actual.mensajeCobro,
+    inventario: datos.inventario !== undefined ? sanearInventario(datos.inventario) : actual.inventario,
   }
 }
 

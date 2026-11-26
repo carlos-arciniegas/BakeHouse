@@ -10,6 +10,7 @@ const actual: EstadoGuardado = {
   negocio: { nombre: "Pachon's Bakehouse", pais: 'VE' },
   bcv: { tasa: 100, actualizado: 'BCV 9:00' },
   mensajeCobro: '',
+  inventario: {},
 }
 
 describe('respaldo JSON', () => {
@@ -20,18 +21,20 @@ describe('respaldo JSON', () => {
       metodos: [{ id: 'm1', tipo: 'bizum', activo: true, datos: { telefono: '600', titular: '' } }],
       negocio: { nombre: 'Dulce Mila', pais: 'ES' },
       mensajeCobro: 'Hola {cliente}, total {saldo}',
+      inventario: { '2026-11-26': { prod_base_1: 10 } },
     }
     expect(leerRespaldo(JSON.stringify(crearRespaldo(estado)), actual)).toEqual(estado)
   })
 
-  it('acepta respaldos viejos con "pagoMovil" y sin negocio ni mensajeCobro', () => {
+  it('acepta respaldos viejos con "pagoMovil" y sin negocio ni mensajeCobro ni inventario', () => {
     const viejo = { clientes: [], pagoMovil: { banco: 'Banesco (0134)', telefono: '0412', cedula: 'V-1', incluirEnMensaje: true } }
-    const conPlantilla = { ...actual, mensajeCobro: 'Mi mensaje' }
+    const conPlantilla = { ...actual, mensajeCobro: 'Mi mensaje', inventario: { '2026-11-26': { prod_base_1: 6 } } }
     const estado = leerRespaldo(JSON.stringify(viejo), conPlantilla)!
     expect(estado.metodos[0].tipo).toBe('pagomovil')
     expect(estado.negocio).toEqual(conPlantilla.negocio)
     expect(estado.catalogo).toEqual(conPlantilla.catalogo)
     expect(estado.mensajeCobro).toBe('Mi mensaje')
+    expect(estado.inventario).toEqual(conPlantilla.inventario)
   })
 
   it('rechaza archivos que no son un respaldo', () => {
