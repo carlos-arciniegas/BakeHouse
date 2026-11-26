@@ -2,7 +2,7 @@ import { formatearFechaCorta } from './fechas'
 import { construirBloquePagos } from './metodosPago'
 import { convertirABolivares, formatearBolivares, formatearMoneda, tasaActiva } from './moneda'
 import { calcularResumenCliente, estadoSaldo, textoMovimiento } from './saldo'
-import type { Cliente, MetodoPago, Negocio, Pais } from './tipos'
+import type { Cliente, MetodoPago, Movimiento, Negocio, Pais } from './tipos'
 
 /** Todo lo que un mensaje necesita saber del negocio */
 export interface ContextoMensaje {
@@ -44,12 +44,33 @@ function conBolivares(monto: number, ctx: ContextoMensaje): string {
   return ' (*' + formatearBolivares(convertirABolivares(monto, ctx.tasa)) + '* a tasa BCV ' + formatearBolivares(ctx.tasa) + ')'
 }
 
-/** Recordatorio de cobro con las últimas 3 ventas y las formas de pago activas */
+const CENTAVO = 0.009
+
+/** Ventas todavía no cubiertas por los pagos del cliente (los pagos cubren primero las más antiguas) */
+export function ventasPendientes(cliente: Cliente): Movimiento[] {
+  const { totalAbonos } = calcularResumenCliente(cliente)
+  let porCubrir = totalAbonos
+  const pendientes: Movimiento[] = []
+
+  for (const m of cliente.movimientos ?? []) {
+    if (m.tipo !== 'venta') continue
+    const monto = Number(m.monto) || 0
+    if (porCubrir + CENTAVO >= monto) {
+      porCubrir = Math.max(0, Math.round((porCubrir - monto) * 100) / 100)
+      continue
+    }
+    porCubrir = 0
+    pendientes.push(m)
+  }
+  return pendientes
+}
+
+/** Recordatorio de cobro con las últimas 3 ventas pendientes y las formas de pago activas */
 export function mensajeCobro(cliente: Cliente, ctx: ContextoMensaje): string {
   const { saldo } = calcularResumenCliente(cliente)
   const moneda = (n: number) => formatearMoneda(n, ctx.pais)
 
-  const ventas = cliente.movimientos.filter((m) => m.tipo === 'venta').slice(-3)
+  const ventas = ventasPendientes(cliente).slice(-3)
   const detalle = ventas.length
     ? '*Detalle reciente:*\n' + ventas.map((v) => '• ' + v.descripcion + ' (' + moneda(v.monto) + ')').join('\n')
     : ''

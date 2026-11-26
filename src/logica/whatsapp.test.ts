@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PAISES } from './paises'
 import type { Cliente, MetodoPago } from './tipos'
-import { enlaceWhatsApp, mensajeCobro, mensajeEstadoCuenta, PLANTILLA_COBRO_PREDETERMINADA, type ContextoMensaje } from './whatsapp'
+import { enlaceWhatsApp, mensajeCobro, mensajeEstadoCuenta, PLANTILLA_COBRO_PREDETERMINADA, ventasPendientes, type ContextoMensaje } from './whatsapp'
 
 const plano = (s: string) => s.replace(/[  ]/g, ' ')
 
@@ -46,6 +46,51 @@ describe('mensajeCobro', () => {
   it('si la plantilla está vacía o solo con espacios usa la predeterminada', () => {
     expect(mensajeCobro(maria, { ...venezuela, plantillaCobro: '   \n ' }))
       .toBe(mensajeCobro(maria, { ...venezuela, plantillaCobro: PLANTILLA_COBRO_PREDETERMINADA }))
+  })
+
+  it('excluye del detalle reciente las compras ya pagadas (incluso con dos pagos el mismo día)', () => {
+    const clienteRecompra: Cliente = {
+      id: 'c2', nombre: 'Luis', telefono: '584121112233', nota: '',
+      movimientos: [
+        { id: 'v1', tipo: 'venta', descripcion: '2x Galleta', monto: 3, fecha: '2026-11-20' },
+        { id: 'a1', tipo: 'abono', descripcion: 'Pago (Pago Móvil)', monto: 1.5, fecha: '2026-11-20' },
+        { id: 'a2', tipo: 'abono', descripcion: 'Pago (Efectivo)', monto: 1.5, fecha: '2026-11-20' },
+        { id: 'v2', tipo: 'venta', descripcion: '1x Brownie', monto: 2.5, fecha: '2026-11-21' },
+      ],
+    }
+    const msg = plano(mensajeCobro(clienteRecompra, venezuela))
+    expect(msg).not.toContain('2x Galleta')
+    expect(msg).toContain('*Detalle reciente:*\n• 1x Brownie ($2,50)')
+  })
+
+  it('ventasPendientes cubre primero las más antiguas y queda vacío si está al día o a favor', () => {
+    const parcial: Cliente = {
+      ...maria,
+      movimientos: [
+        { id: 'v1', tipo: 'venta', descripcion: '2x Galleta', monto: 3, fecha: '2026-11-12' },
+        { id: 'v2', tipo: 'venta', descripcion: '1x Brownie', monto: 2.5, fecha: '2026-11-15' },
+        { id: 'a1', tipo: 'abono', descripcion: 'Pago (Efectivo)', monto: 3, fecha: '2026-11-16' },
+      ],
+    }
+    expect(ventasPendientes(parcial).map((m) => m.id)).toEqual(['v2'])
+
+    const pagadoTotal: Cliente = {
+      ...maria,
+      movimientos: [
+        { id: 'v1', tipo: 'venta', descripcion: '2x Galleta', monto: 3, fecha: '2026-11-12' },
+        { id: 'a1', tipo: 'abono', descripcion: 'Pago (Efectivo)', monto: 3, fecha: '2026-11-12' },
+      ],
+    }
+    expect(ventasPendientes(pagadoTotal)).toEqual([])
+
+    const aFavor: Cliente = {
+      ...maria,
+      movimientos: [
+        { id: 'v1', tipo: 'venta', descripcion: '2x Galleta', monto: 3, fecha: '2026-11-12' },
+        { id: 'a1', tipo: 'abono', descripcion: 'Pago (Efectivo)', monto: 5, fecha: '2026-11-12' },
+      ],
+    }
+    expect(ventasPendientes(aFavor)).toEqual([])
   })
 })
 
