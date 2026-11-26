@@ -18,6 +18,7 @@ function usePersistencia(estado: EstadoGuardado) {
     if (a.metodos !== estado.metodos) guardar.metodos(localStorage, estado.metodos)
     if (a.negocio !== estado.negocio) guardar.negocio(localStorage, estado.negocio)
     if (a.bcv !== estado.bcv) guardar.bcv(localStorage, estado.bcv)
+    if (a.mensajeCobro !== estado.mensajeCobro) guardar.mensajeCobro(localStorage, estado.mensajeCobro)
     anterior.current = estado
 
     const negocioId = a !== estado ? negocioSincronizado(localStorage) : null

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
-import { abrirConDatos, guardado, plano } from './ayudantes.ts'
+import { abrirConDatos, fila, guardado, plano } from './ayudantes.ts'
 
 test.beforeEach(async ({ page }) => {
   await abrirConDatos(page)
@@ -69,4 +69,38 @@ test('borrar todos los datos pide confirmación', async ({ page }) => {
   await page.getByRole('alertdialog').getByRole('button', { name: 'Sí, continuar' }).click()
   await ir(page, 'Cuentas')
   await expect(page.getByRole('heading', { name: 'Tu libreta está en blanco' })).toBeVisible()
+})
+
+test('mensaje de cobro: se edita en Pagos, se ve en la vista previa, llega a WhatsApp y se puede restaurar', async ({ page }) => {
+  await ir(page, 'Pagos')
+
+  const campo = page.getByLabel('Plantilla para cobrar por WhatsApp')
+  await campo.fill('Hola {cliente}, tu saldo es ')
+  await page.getByRole('button', { name: /^Saldo/ }).click()
+  await expect(campo).toHaveValue('Hola {cliente}, tu saldo es {saldo}')
+
+  const plantilla = 'Hola {cliente}, tu saldo es {saldo}.\n\n{pagos}'
+  await campo.fill(plantilla)
+  const previa = plano(await page.locator('.burbuja-previa').textContent())
+  expect(previa).toContain('Hola María, tu saldo es *$5,50* (*Bs. 550,00* a tasa BCV Bs. 100,00).')
+  expect(previa).toContain('*Pago Móvil*')
+
+  await page.getByRole('button', { name: 'Guardar mensaje' }).click()
+  await expect(page.locator('.toast').last()).toHaveText('Mensaje de cobro guardado')
+
+  await ir(page, 'Cuentas')
+  const href = (await fila(page, 'José Rodríguez').getByRole('link', { name: /Cobrar \$11,00 por WhatsApp/ }).getAttribute('href'))!
+  const mensaje = plano(new URL(href).searchParams.get('text'))
+  expect(mensaje).toContain('Hola José, tu saldo es *$11,00* (*Bs. 1.100,00* a tasa BCV Bs. 100,00).')
+  expect(mensaje).toContain('*Pago Móvil*')
+
+  await page.reload()
+  const hrefRecargado = (await fila(page, 'José Rodríguez').getByRole('link', { name: /Cobrar \$11,00 por WhatsApp/ }).getAttribute('href'))!
+  expect(plano(new URL(hrefRecargado).searchParams.get('text'))).toContain('Hola José, tu saldo es *$11,00*')
+
+  await ir(page, 'Pagos')
+  await page.getByRole('button', { name: 'Restaurar original' }).click()
+  await expect(campo).toHaveValue(/^¡Hola \{cliente\}!/)
+  await page.getByRole('button', { name: 'Deshacer' }).click()
+  await expect(campo).toHaveValue(plantilla)
 })

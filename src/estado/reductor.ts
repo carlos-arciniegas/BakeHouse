@@ -24,6 +24,7 @@ export type Accion =
   | { tipo: 'metodo/restaurar'; metodo: MetodoPago; indice: number }
   | { tipo: 'negocio/guardar'; negocio: Negocio }
   | { tipo: 'bcv/guardar'; bcv: ConfigBCV }
+  | { tipo: 'mensajeCobro/guardar'; plantilla: string }
   | { tipo: 'estado/reemplazar'; estado: EstadoGuardado }
 
 function conCliente(estado: EstadoGuardado, id: string, cambio: (c: Cliente) => Cliente): EstadoGuardado {
@@ -90,6 +91,8 @@ export function reductor(estado: EstadoGuardado, accion: Accion): EstadoGuardado
       return { ...estado, negocio: accion.negocio }
     case 'bcv/guardar':
       return { ...estado, bcv: accion.bcv }
+    case 'mensajeCobro/guardar':
+      return { ...estado, mensajeCobro: accion.plantilla }
     case 'estado/reemplazar':
       return accion.estado
   }

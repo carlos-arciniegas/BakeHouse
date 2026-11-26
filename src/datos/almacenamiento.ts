@@ -14,6 +14,7 @@ export const CLAVES = {
   catalogo: 'pachons_catalog_v3',
   negocio: 'pachons_negocio_v1',
   ultimoMetodo: 'pachons_ultimo_metodo_v1',
+  mensajeCobro: 'pachons_mensaje_cobro_v1',
 } as const
 
 export const CATALOGO_PREDETERMINADO: Producto[] = [
@@ -31,6 +32,7 @@ export interface EstadoGuardado {
   metodos: MetodoPago[]
   negocio: Negocio
   bcv: ConfigBCV
+  mensajeCobro: string
 }
 
 /** Lo mínimo de Storage que se usa; permite probar con un almacenamiento en memoria */
@@ -127,6 +129,10 @@ function sanearBCV(b: unknown): ConfigBCV {
   return { tasa: Number(x.tasa) > 0 ? Number(x.tasa) : 0, actualizado: String(x.actualizado ?? '') }
 }
 
+function sanearMensajeCobro(valor: unknown): string {
+  return typeof valor === 'string' ? valor : ''
+}
+
 /**
  * Carga todo lo guardado. Si encuentra datos del formato viejo de Pago Móvil y aún no hay
  * métodos de pago, los convierte y guarda el resultado.
@@ -153,6 +159,7 @@ export function cargarEstado(almacen: Almacen): EstadoGuardado {
     metodos,
     negocio: sanearNegocio(leerJSON(almacen, CLAVES.negocio)) ?? { ...NEGOCIO_PREDETERMINADO },
     bcv: sanearBCV(leerJSON(almacen, CLAVES.bcv)),
+    mensajeCobro: sanearMensajeCobro(leerJSON(almacen, CLAVES.mensajeCobro)),
   }
 }
 
@@ -163,6 +170,7 @@ export const guardar = {
   metodos: (a: Almacen, metodos: MetodoPago[]) => guardarJSON(a, CLAVES.metodos, metodos),
   negocio: (a: Almacen, negocio: Negocio) => guardarJSON(a, CLAVES.negocio, negocio),
   bcv: (a: Almacen, bcv: ConfigBCV) => guardarJSON(a, CLAVES.bcv, bcv),
+  mensajeCobro: (a: Almacen, mensajeCobro: string) => guardarJSON(a, CLAVES.mensajeCobro, mensajeCobro),
 }
 
 export function leerUltimoMetodo(a: Almacen): string {

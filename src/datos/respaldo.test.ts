@@ -9,6 +9,7 @@ const actual: EstadoGuardado = {
   metodos: [],
   negocio: { nombre: "Pachon's Bakehouse", pais: 'VE' },
   bcv: { tasa: 100, actualizado: 'BCV 9:00' },
+  mensajeCobro: '',
 }
 
 describe('respaldo JSON', () => {
@@ -18,16 +19,19 @@ describe('respaldo JSON', () => {
       clientes: [{ id: 'c1', nombre: 'Ana', telefono: '34600123456', nota: '', movimientos: [{ id: 'm', tipo: 'venta', descripcion: 'x', monto: 3, fecha: '2026-11-20' }] }],
       metodos: [{ id: 'm1', tipo: 'bizum', activo: true, datos: { telefono: '600', titular: '' } }],
       negocio: { nombre: 'Dulce Mila', pais: 'ES' },
+      mensajeCobro: 'Hola {cliente}, total {saldo}',
     }
     expect(leerRespaldo(JSON.stringify(crearRespaldo(estado)), actual)).toEqual(estado)
   })
 
-  it('acepta respaldos viejos con "pagoMovil" y sin negocio', () => {
+  it('acepta respaldos viejos con "pagoMovil" y sin negocio ni mensajeCobro', () => {
     const viejo = { clientes: [], pagoMovil: { banco: 'Banesco (0134)', telefono: '0412', cedula: 'V-1', incluirEnMensaje: true } }
-    const estado = leerRespaldo(JSON.stringify(viejo), actual)!
+    const conPlantilla = { ...actual, mensajeCobro: 'Mi mensaje' }
+    const estado = leerRespaldo(JSON.stringify(viejo), conPlantilla)!
     expect(estado.metodos[0].tipo).toBe('pagomovil')
-    expect(estado.negocio).toEqual(actual.negocio)
-    expect(estado.catalogo).toEqual(actual.catalogo)
+    expect(estado.negocio).toEqual(conPlantilla.negocio)
+    expect(estado.catalogo).toEqual(conPlantilla.catalogo)
+    expect(estado.mensajeCobro).toBe('Mi mensaje')
   })
 
   it('rechaza archivos que no son un respaldo', () => {

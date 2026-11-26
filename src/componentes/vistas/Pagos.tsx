@@ -1,7 +1,107 @@
+import { useRef, useState, type FormEvent } from 'react'
 import { construirBloquePagos, nombreMetodo, resumenMetodo } from '../../logica/metodosPago'
+import { CLIENTE_VISTA_PREVIA, mensajeCobro, PLANTILLA_COBRO_PREDETERMINADA, VARIABLES_COBRO } from '../../logica/whatsapp'
 import { useAvisos, useTienda, useUI } from '../../estado/contextos'
 import { Icono, Interruptor } from '../base'
 import { copiarTexto } from '../ganchos'
+
+function EditorMensajeCobro() {
+  const { estado, despachar, pais } = useTienda()
+  const avisar = useAvisos()
+  const areaRef = useRef<HTMLTextAreaElement>(null)
+
+  const guardado = estado.mensajeCobro || PLANTILLA_COBRO_PREDETERMINADA
+  const [texto, setTexto] = useState(guardado)
+  const [guardadoAntes, setGuardadoAntes] = useState(guardado)
+  if (guardado !== guardadoAntes) {
+    setGuardadoAntes(guardado)
+    setTexto(guardado)
+  }
+
+  const insertar = (codigo: string) => {
+    const el = areaRef.current
+    const inicio = el?.selectionStart ?? texto.length
+    const fin = el?.selectionEnd ?? texto.length
+    const nuevo = texto.slice(0, inicio) + codigo + texto.slice(fin)
+    setTexto(nuevo)
+    requestAnimationFrame(() => {
+      if (!areaRef.current) return
+      areaRef.current.focus()
+      const pos = inicio + codigo.length
+      areaRef.current.setSelectionRange(pos, pos)
+    })
+  }
+
+  const guardar = (e: FormEvent) => {
+    e.preventDefault()
+    if (!texto.trim()) {
+      avisar('Escribe el texto del mensaje o restaura el original', { error: true })
+      return
+    }
+    const plantilla = texto.trim() === PLANTILLA_COBRO_PREDETERMINADA ? '' : texto
+    despachar({ tipo: 'mensajeCobro/guardar', plantilla })
+    avisar('Mensaje de cobro guardado')
+  }
+
+  const restaurar = () => {
+    const anterior = estado.mensajeCobro
+    setTexto(PLANTILLA_COBRO_PREDETERMINADA)
+    if (anterior) {
+      despachar({ tipo: 'mensajeCobro/guardar', plantilla: '' })
+      avisar('Mensaje original restaurado', {
+        accion: { texto: 'Deshacer', fn: () => despachar({ tipo: 'mensajeCobro/guardar', plantilla: anterior }) },
+      })
+    } else {
+      avisar('Mensaje original restaurado')
+    }
+  }
+
+  const vistaPrevia = mensajeCobro(CLIENTE_VISTA_PREVIA, {
+    negocio: estado.negocio,
+    pais,
+    tasa: estado.bcv.tasa,
+    metodos: estado.metodos,
+    plantillaCobro: texto,
+  })
+
+  return (
+    <div className="bloque-mensaje columnas columnas--pm">
+      <div className="panel">
+        <div className="panel__cabeza">
+          <h2>Mensaje de cobro</h2>
+          {(texto !== PLANTILLA_COBRO_PREDETERMINADA || estado.mensajeCobro !== '') && (
+            <button type="button" className="boton boton--texto" onClick={restaurar}>Restaurar original</button>
+          )}
+        </div>
+        <form className="form" onSubmit={guardar}>
+          <div className="campo">
+            <label htmlFor="mensajeCobroTexto" className="campo__etq">Plantilla para cobrar por WhatsApp</label>
+            <textarea ref={areaRef} id="mensajeCobroTexto" className="entrada entrada--mensaje" rows={7}
+              value={texto} onChange={(e) => setTexto(e.target.value)} />
+            <div className="chips" role="group" aria-label="Insertar datos en el mensaje">
+              {VARIABLES_COBRO.map((v) => (
+                <button key={v.codigo} type="button" className="chip" onClick={() => insertar(v.codigo)}>
+                  {v.etiqueta} <b>{v.codigo}</b>
+                </button>
+              ))}
+            </div>
+            <p className="ayuda">Toca una etiqueta para insertarla donde esté el cursor. Usa *asteriscos* para negritas en WhatsApp.</p>
+          </div>
+          <div><button type="submit" className="boton boton--primario">Guardar mensaje</button></div>
+        </form>
+      </div>
+
+      <div className="panel">
+        <div className="panel__cabeza">
+          <h2>Vista previa</h2>
+        </div>
+        <div className="chat">
+          <div className="burbuja-previa">{vistaPrevia}</div>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 export function Pagos() {
   const { estado, despachar } = useTienda()
@@ -81,6 +181,8 @@ export function Pagos() {
           </div>
         </div>
       </div>
+
+      <EditorMensajeCobro />
     </section>
   )
 }

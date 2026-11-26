@@ -12,6 +12,7 @@ const inicial: EstadoGuardado = {
   metodos: [{ id: 'm1', tipo: 'zelle', activo: true, datos: { contacto: 'a@b.c' } }],
   negocio: { nombre: 'Pachon\'s', pais: 'VE' },
   bcv: { tasa: 0, actualizado: '' },
+  mensajeCobro: '',
 }
 
 describe('reductor', () => {
@@ -60,5 +61,10 @@ describe('reductor', () => {
     expect(e.clientes).toEqual([])
     expect(e.catalogo).toBe(inicial.catalogo)
     expect(e.negocio).toBe(inicial.negocio)
+  })
+
+  it('guarda la plantilla personalizada del mensaje de cobro', () => {
+    const e = reductor(inicial, { tipo: 'mensajeCobro/guardar', plantilla: 'Hola {cliente}, debes {saldo}' })
+    expect(e.mensajeCobro).toBe('Hola {cliente}, debes {saldo}')
   })
 })

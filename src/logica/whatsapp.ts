@@ -10,6 +10,29 @@ export interface ContextoMensaje {
   pais: Pais
   tasa: number
   metodos: MetodoPago[]
+  plantillaCobro?: string
+}
+
+export const PLANTILLA_COBRO_PREDETERMINADA =
+  '¡Hola {cliente}! 👋 Te escribo de *{negocio}* 🍪✨ para comentarte que tu saldo pendiente actual es de {saldo}.\n\n{detalle}\n\n{pagos}\n\n¡Avísame cualquier cosa o si deseas pedir algún otro dulce! 🤎'
+
+export const VARIABLES_COBRO = [
+  { codigo: '{cliente}', etiqueta: 'Nombre' },
+  { codigo: '{saldo}', etiqueta: 'Saldo' },
+  { codigo: '{detalle}', etiqueta: 'Últimas ventas' },
+  { codigo: '{pagos}', etiqueta: 'Formas de pago' },
+  { codigo: '{negocio}', etiqueta: 'Negocio' },
+] as const
+
+export const CLIENTE_VISTA_PREVIA: Cliente = {
+  id: 'vista_previa',
+  nombre: 'María',
+  telefono: '',
+  nota: '',
+  movimientos: [
+    { id: 'vp_1', tipo: 'venta', descripcion: '2x Galleta Choco Chip', monto: 3, fecha: '2026-11-20' },
+    { id: 'vp_2', tipo: 'venta', descripcion: '1x Brownie', monto: 2.5, fecha: '2026-11-22' },
+  ],
 }
 
 function primerNombre(cliente: Cliente): string {
@@ -28,15 +51,22 @@ export function mensajeCobro(cliente: Cliente, ctx: ContextoMensaje): string {
 
   const ventas = cliente.movimientos.filter((m) => m.tipo === 'venta').slice(-3)
   const detalle = ventas.length
-    ? '\n\n*Detalle reciente:*\n' + ventas.map((v) => '• ' + v.descripcion + ' (' + moneda(v.monto) + ')').join('\n')
+    ? '*Detalle reciente:*\n' + ventas.map((v) => '• ' + v.descripcion + ' (' + moneda(v.monto) + ')').join('\n')
     : ''
 
-  const bloque = construirBloquePagos(ctx.metodos)
+  const valores: Record<string, string> = {
+    cliente: primerNombre(cliente),
+    negocio: ctx.negocio.nombre,
+    saldo: '*' + moneda(saldo) + '*' + conBolivares(saldo, ctx),
+    detalle,
+    pagos: construirBloquePagos(ctx.metodos),
+  }
 
-  return '¡Hola ' + primerNombre(cliente) + '! 👋 Te escribo de *' + ctx.negocio.nombre + '* 🍪✨ para comentarte que ' +
-    'tu saldo pendiente actual es de *' + moneda(saldo) + '*' + conBolivares(saldo, ctx) + '.' +
-    detalle + (bloque ? '\n\n' + bloque : '') +
-    '\n\n¡Avísame cualquier cosa o si deseas pedir algún otro dulce! 🤎'
+  const plantilla = ctx.plantillaCobro?.trim() ? ctx.plantillaCobro : PLANTILLA_COBRO_PREDETERMINADA
+  return plantilla
+    .replace(/\{(cliente|negocio|saldo|detalle|pagos)\}/g, (_, clave: string) => valores[clave])
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
 
 /** Estado de cuenta con los últimos 10 movimientos y el saldo (pendiente o a favor) */

@@ -280,13 +280,15 @@ textarea.entrada { min-height: 96px; resize: vertical; line-height: 1.4; }
 @media (min-width: 900px) { .solo-movil { display: none; } .solo-escritorio { display: inline; } }
 
 .chat { padding: 16px; border-radius: var(--radio); background: #EFE7DD; }
-.burbuja {
+.burbuja, .burbuja-previa {
   max-width: 94%; margin-left: auto; padding: 10px 12px;
   border-radius: 8px 2px 8px 8px;
   background: #D9FDD3; color: #111B21;
   font-size: 14px; line-height: 1.5; white-space: pre-line;
   box-shadow: 0 1px .5px rgb(11 20 26 / .13);
 }
+.bloque-mensaje { margin-top: 36px; padding-top: 32px; border-top: 1px solid var(--linea); }
+.entrada--mensaje { min-height: 168px; line-height: 1.5; }
 
 .seccion { padding: 24px 0; border-bottom: 1px solid var(--linea); }
 .seccion:first-child { padding-top: 0; }

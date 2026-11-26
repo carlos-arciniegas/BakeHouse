@@ -22,6 +22,7 @@ const base: EstadoGuardado = {
   metodos: [{ id: 'met_1', tipo: 'pagomovil', datos: { banco: 'Banesco' }, activo: true }],
   negocio: { nombre: "Pachon's Bakehouse", pais: 'VE' },
   bcv: { tasa: 100, actualizado: 'BCV' },
+  mensajeCobro: '',
 }
 
 const resumen = (r: ReturnType<typeof diferencias>) => r.cambios.map((c) => ('borrar' in c ? '-' : '+') + c.tabla + '/' + c.id)

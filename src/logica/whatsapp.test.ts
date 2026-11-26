@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PAISES } from './paises'
 import type { Cliente, MetodoPago } from './tipos'
-import { enlaceWhatsApp, mensajeCobro, mensajeEstadoCuenta, type ContextoMensaje } from './whatsapp'
+import { enlaceWhatsApp, mensajeCobro, mensajeEstadoCuenta, PLANTILLA_COBRO_PREDETERMINADA, type ContextoMensaje } from './whatsapp'
 
 const plano = (s: string) => s.replace(/[  ]/g, ' ')
 
@@ -33,6 +33,19 @@ describe('mensajeCobro', () => {
     expect(msg).toContain('es de *3,50 €*.')
     expect(msg).not.toContain('Bs.')
     expect(msg).toContain('💳 *Formas de pago:*\n\n*Bizum*\n• Teléfono: +34 611 22 33 44')
+  })
+
+  it('usa la plantilla personalizada reemplazando todas las etiquetas y colapsando saltos vacíos', () => {
+    const plantilla = 'Hola {cliente} ({negocio}) debes {saldo} — repito {saldo}.\n\n{detalle}\n\n{pagos}\n\nGracias {cliente}.'
+    const msg = plano(mensajeCobro(maria, { ...venezuela, plantillaCobro: plantilla }))
+    expect(msg).toContain("Hola María (Pachon's Bakehouse) debes *$3,50* (*Bs. 350,00* a tasa BCV Bs. 100,00) — repito *$3,50* (*Bs. 350,00* a tasa BCV Bs. 100,00).")
+    expect(msg).toContain('*Detalle reciente:*\n• 2x Galleta ($3,00)\n• 1x Brownie ($2,50)\n\nGracias María.')
+    expect(msg).not.toContain('\n\n\n')
+  })
+
+  it('si la plantilla está vacía o solo con espacios usa la predeterminada', () => {
+    expect(mensajeCobro(maria, { ...venezuela, plantillaCobro: '   \n ' }))
+      .toBe(mensajeCobro(maria, { ...venezuela, plantillaCobro: PLANTILLA_COBRO_PREDETERMINADA }))
   })
 })
 

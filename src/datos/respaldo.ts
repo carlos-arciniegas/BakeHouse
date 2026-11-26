@@ -11,6 +11,7 @@ export function crearRespaldo(estado: EstadoGuardado) {
     metodosPago: estado.metodos,
     negocio: estado.negocio,
     bcv: estado.bcv,
+    mensajeCobro: estado.mensajeCobro,
   }
 }
 
@@ -39,6 +40,7 @@ export function leerRespaldo(texto: string, actual: EstadoGuardado): EstadoGuard
     metodos: metodos ?? actual.metodos,
     negocio: sanearNegocio(datos.negocio) ?? actual.negocio,
     bcv: bcv && Number(bcv.tasa) > 0 ? { tasa: Number(bcv.tasa), actualizado: String(bcv.actualizado ?? '') } : actual.bcv,
+    mensajeCobro: typeof datos.mensajeCobro === 'string' ? datos.mensajeCobro : actual.mensajeCobro,
   }
 }
 

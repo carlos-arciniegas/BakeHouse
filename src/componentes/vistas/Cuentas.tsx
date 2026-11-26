@@ -21,7 +21,7 @@ function FilaCliente({ cliente }: { cliente: Cliente }) {
   const estadoCliente = estadoSaldo(saldo)
   const conTasa = tasaActiva(pais, estado.bcv.tasa)
   const moneda = (n: number) => formatearMoneda(n, pais)
-  const ctx = { negocio: estado.negocio, pais, tasa: estado.bcv.tasa, metodos: estado.metodos }
+  const ctx = { negocio: estado.negocio, pais, tasa: estado.bcv.tasa, metodos: estado.metodos, plantillaCobro: estado.mensajeCobro }
   const esResaltado = resaltado === cliente.id
 
   // Tras guardar algo de este cliente, llevarlo a la vista

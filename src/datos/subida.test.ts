@@ -17,6 +17,7 @@ function estadoCon(clientes: number, movimientosPorCliente: number): EstadoGuard
     metodos: [{ id: 'met_1', tipo: 'pagomovil', datos: {}, activo: true }],
     negocio: { nombre: "Pachon's Bakehouse", pais: 'VE' },
     bcv: { tasa: 100, actualizado: 'BCV' },
+    mensajeCobro: '',
   }
 }
 

@@ -15,6 +15,7 @@ describe('cargarEstado', () => {
     expect(estado.metodos).toEqual([])
     expect(estado.negocio).toEqual({ nombre: "Pachon's Bakehouse", pais: 'VE' })
     expect(estado.bcv).toEqual({ tasa: 0, actualizado: '' })
+    expect(estado.mensajeCobro).toBe('')
   })
 
   it('lee los datos con el formato de la versión anterior', () => {
@@ -103,5 +104,14 @@ describe('guardar', () => {
   it('no falla si el almacenamiento está lleno o bloqueado', () => {
     const lleno: Almacen = { getItem: () => null, setItem: () => { throw new Error('QuotaExceededError') } }
     expect(() => guardar.catalogo(lleno, [])).not.toThrow()
+  })
+
+  it('guarda y carga el mensaje de cobro personalizado, ignorando valores no válidos', () => {
+    const almacen = memoria()
+    guardar.mensajeCobro(almacen, 'Hola {cliente}, debes {saldo}')
+    expect(cargarEstado(almacen).mensajeCobro).toBe('Hola {cliente}, debes {saldo}')
+
+    almacen.datos.set(CLAVES.mensajeCobro, JSON.stringify(123))
+    expect(cargarEstado(almacen).mensajeCobro).toBe('')
   })
 })
