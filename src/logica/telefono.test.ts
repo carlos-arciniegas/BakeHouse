@@ -60,4 +60,8 @@ describe('telefonoParaEditar', () => {
     expect(telefonoParaEditar('34600123456', PAISES.VE)).toBe('+34600123456')
     expect(normalizarTelefono('+34600123456', PAISES.VE)).toBe('34600123456')
   })
+
+  it('devuelve vacío si el cliente todavía no tiene teléfono', () => {
+    expect(telefonoParaEditar('', PAISES.VE)).toBe('')
+  })
 })

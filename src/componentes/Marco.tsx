@@ -95,6 +95,7 @@ let ultimoTotal = 0
 /** El total por cobrar bajo el borde de pastelería. Al abrir la app el toldo se "desenrolla" una vez. */
 export function Toldo() {
   const { estado, pais } = useTienda()
+  const { abrirHoja } = useUI()
   const resumen = calcularResumenGlobal(estado.clientes)
   const total = useConteo(resumen.porCobrar, ultimoTotal)
   useEffect(() => { ultimoTotal = resumen.porCobrar }, [resumen.porCobrar])
@@ -118,6 +119,10 @@ export function Toldo() {
               : 'Escribe la tasa BCV para ver bolívares'}
           </p>
           <p className="toldo__resumen">{fraseResumen(resumen, (n) => formatearMoneda(n, pais))}</p>
+          {/* La venta es lo más frecuente: arriba, sin tener que buscar la fila del cliente */}
+          <button type="button" className="boton toldo__venta" onClick={() => abrirHoja({ tipo: 'venta' })}>
+            <Icono nombre="mas" />Nueva venta
+          </button>
         </div>
       </div>
       <div className="toldo__borde" aria-hidden="true" />

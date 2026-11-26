@@ -19,7 +19,10 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
   const opciones = opcionesDePago(estado.metodos)
   const ultimo = leerUltimoMetodo(localStorage)
 
-  const [idCliente, setIdCliente] = useState(clienteId ?? clientesOrdenados[0]?.id ?? '')
+  // Desde la fila viene elegido; desde "Nueva venta" el desplegable arranca vacío (sin elegir uno al azar)
+  const [idCliente, setIdCliente] = useState(clienteId ?? '')
+  const [creando, setCreando] = useState(clientesOrdenados.length === 0)
+  const [nombreNuevo, setNombreNuevo] = useState('')
   const [seleccion, setSeleccion] = useState<Seleccion>({})
   const [descripcion, setDescripcion] = useState('')
   const [monto, setMonto] = useState('')
@@ -28,7 +31,7 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
   const [metodo, setMetodo] = useState(opciones.includes(ultimo) ? ultimo : opciones[0])
   const botonGuardar = useRef<HTMLButtonElement>(null)
 
-  const cliente = estado.clientes.find((c) => c.id === idCliente)
+  const cliente = creando ? undefined : estado.clientes.find((c) => c.id === idCliente)
   const saldo = cliente ? calcularResumenCliente(cliente).saldo : 0
   const montoNum = parseFloat(monto) || 0
   const haySeleccion = Object.keys(seleccion).length > 0
@@ -49,7 +52,8 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
 
   const anotarVenta = (e: FormEvent) => {
     e.preventDefault()
-    if (!cliente || !descripcion.trim() || !(montoNum > 0)) {
+    const nombreLimpio = nombreNuevo.trim()
+    if ((creando ? !nombreLimpio : !cliente) || !descripcion.trim() || !(montoNum > 0)) {
       avisar('Revisa los datos de la venta', { error: true })
       return
     }
@@ -62,12 +66,25 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
       movimientos.push({ id: nuevoId('mov'), tipo: 'abono', descripcion: 'Pago (' + metodo + ')', monto: valor, fecha })
       recordarUltimoMetodo(localStorage, metodo)
     }
-    despachar({ tipo: 'movimientos/agregar', clienteId: cliente.id, movimientos })
-    resaltar(cliente.id)
+    let id: string
+    let nombreCompleto: string
+    if (cliente) {
+      id = cliente.id
+      nombreCompleto = cliente.nombre
+      despachar({ tipo: 'movimientos/agregar', clienteId: id, movimientos })
+    } else {
+      // Cliente nuevo: se agrega con la venta de una vez (el teléfono se completa luego en Editar)
+      id = nuevoId('cli')
+      nombreCompleto = nombreLimpio
+      despachar({ tipo: 'cliente/agregar', cliente: { id, nombre: nombreCompleto, telefono: '', nota: '', movimientos } })
+    }
+    irA('cuentas')
+    resaltar(id)
     cerrarHoja()
 
-    const nombre = cliente.nombre.split(' ')[0]
-    if (pagada) avisar('Venta pagada anotada a ' + nombre)
+    const nombre = nombreCompleto.split(' ')[0]
+    if (!cliente) avisar((pagada ? 'Venta pagada anotada a ' : 'Venta anotada a ') + nombre + ', cliente nuevo')
+    else if (pagada) avisar('Venta pagada anotada a ' + nombre)
     else if (estadoSaldo(saldo) === 'favor') avisar('Venta anotada a ' + nombre + ', descontada de su saldo a favor')
     else avisar('Venta anotada a ' + nombre)
   }
@@ -75,10 +92,27 @@ export function HojaVenta({ clienteId }: { clienteId?: string }) {
   return (
     <form className="form" onSubmit={anotarVenta}>
       <div className="campo">
-        <label htmlFor="ventaClienteId" className="campo__etq">Cliente</label>
-        <select id="ventaClienteId" className="entrada" required value={idCliente} onChange={(e) => setIdCliente(e.target.value)}>
-          {clientesOrdenados.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
-        </select>
+        <div className="campo__fila">
+          <label htmlFor={creando ? 'ventaClienteNuevo' : 'ventaClienteId'} className="campo__etq">Cliente</label>
+          {creando ? (
+            clientesOrdenados.length > 0 && (
+              <button type="button" className="boton boton--texto" onClick={() => setCreando(false)}>Elegir de la lista</button>
+            )
+          ) : (
+            <button type="button" className="boton boton--texto" onClick={() => setCreando(true)}>
+              <Icono nombre="mas" chico />Cliente nuevo
+            </button>
+          )}
+        </div>
+        {creando ? (
+          <input id="ventaClienteNuevo" type="text" className="entrada" required autoComplete="off" autoFocus
+            placeholder="Nombre del cliente" value={nombreNuevo} onChange={(e) => setNombreNuevo(e.target.value)} />
+        ) : (
+          <select id="ventaClienteId" className="entrada" required value={idCliente} onChange={(e) => setIdCliente(e.target.value)}>
+            <option value="" disabled>Elige un cliente…</option>
+            {clientesOrdenados.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+          </select>
+        )}
         {estadoSaldo(saldo) === 'favor' && (
           <p className="ayuda ayuda--monto">Tiene {formatearMoneda(-saldo, pais)} a favor: esta venta se descuenta de ahí.</p>
         )}

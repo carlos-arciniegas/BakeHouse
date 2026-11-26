@@ -55,7 +55,7 @@ App web (PWA) para que negocios de repostería y emprendimientos lleven el contr
 
 ### Mínimo de toques
 Cada tarea frecuente debe resolverse con la menor cantidad de toques posible. Antes de agregar o cambiar un flujo, contar los toques y buscar cómo quitar uno.
-- Prellenar con lo más probable: el monto del pago viene con la deuda completa, la fecha con hoy, el método de pago con el último usado (`pachons_ultimo_metodo_v1`), el cliente con el de la fila desde donde se abrió.
+- Prellenar con lo más probable: el monto del pago viene con la deuda completa, la fecha con hoy, el método de pago con el último usado (`pachons_ultimo_metodo_v1`), el cliente con el de la fila desde donde se abrió. Desde "Nueva venta" (en el toldo de Cuentas) el desplegable arranca sin elegir a nadie para no anotar una venta al cliente equivocado, y permite crear un cliente nuevo al vuelo.
 - Juntar pasos que casi siempre van juntos: "Ya me pagó" en la venta anota la venta y el pago de una vez.
 - Repetir un toque suma, no duplica: tocar dos veces un producto del catálogo da "2x", con contador en el botón.
 - Todo lo que se suma con un toque se debe poder corregir con otro: los productos con cantidad muestran un botón "−" pegado que resta uno (en 0 se desmarca). Nunca obligar a empezar de cero por un toque de más.

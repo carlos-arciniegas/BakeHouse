@@ -18,6 +18,7 @@ test('carga los datos de la versión anterior y convierte el Pago Móvil viejo',
 test('venta con cantidades y "Ya me pagó" anota venta y pago de una vez', async ({ page }) => {
   await fila(page, 'José Rodríguez').getByRole('button', { name: 'Venta', exact: true }).click()
   const hoja = page.getByRole('dialog', { name: 'Nueva venta' })
+  // Desde la fila, el cliente ya viene elegido en el desplegable
   await expect(hoja.getByLabel('Cliente')).toHaveValue('c2')
 
   const productos = hoja.locator('.chip')
@@ -128,4 +129,47 @@ test('los cambios siguen ahí después de recargar', async ({ page }) => {
   await expect(fila(page, 'María Fernanda Pérez').locator('.fila__aldia')).toBeVisible()
   await page.reload()
   await expect(fila(page, 'María Fernanda Pérez').locator('.fila__aldia')).toHaveText('Al día')
+})
+
+test('"Nueva venta" arriba: elige el cliente en el desplegable sin buscar su fila', async ({ page }) => {
+  await page.getByRole('button', { name: 'Nueva venta' }).click()
+  const hoja = page.getByRole('dialog', { name: 'Nueva venta' })
+
+  // Ningún cliente elegido de antemano en el desplegable
+  const selector = hoja.getByLabel('Cliente')
+  await expect(selector).toHaveValue('')
+  await expect(selector.locator('option')).toHaveText(['Elige un cliente…', 'Andreína Salas', 'José Rodríguez', 'María Fernanda Pérez'])
+
+  await selector.selectOption('c3')
+  await hoja.getByRole('button', { name: /^Brownie Fudge/ }).click()
+  await hoja.getByRole('button', { name: 'Anotar venta' }).click()
+
+  await expect(page.locator('.toast').last()).toHaveText('Venta anotada a Andreína')
+  expect((await movimientosDe(page, 'c3')).at(-1)).toMatchObject({ tipo: 'venta', monto: 2.5 })
+})
+
+test('desde "Nueva venta" se puede agregar un cliente nuevo y luego editar su teléfono', async ({ page }) => {
+  await page.getByRole('button', { name: 'Nueva venta' }).click()
+  const hoja = page.getByRole('dialog', { name: 'Nueva venta' })
+
+  await hoja.getByRole('button', { name: 'Cliente nuevo' }).click()
+  await hoja.getByLabel('Cliente').fill('Marta')
+  await hoja.getByLabel('Qué se llevó').fill('1 torta de chocolate')
+  await hoja.getByLabel('Total en dólares').fill('20')
+  await hoja.getByRole('button', { name: 'Anotar venta' }).click()
+
+  await expect(page.locator('.toast').last()).toHaveText('Venta anotada a Marta, cliente nuevo')
+  const marta = fila(page, 'Marta')
+  await expect(marta.locator('.fila__monto')).toHaveText('$20,00')
+  await expect(page.locator('.toldo__total')).toHaveText('$37,50')
+
+  // Al editar luego al cliente nuevo, el campo de WhatsApp arranca vacío (sin "+")
+  await marta.getByRole('button', { name: /Historial/ }).click()
+  await marta.getByRole('button', { name: 'Editar' }).click()
+  const editar = page.getByRole('dialog', { name: 'Editar cliente' })
+  await expect(editar.getByLabel('WhatsApp')).toHaveValue('')
+  await editar.getByLabel('WhatsApp').fill('04125550000')
+  await editar.getByRole('button', { name: 'Guardar cliente' }).click()
+
+  await expect(marta.locator('.fila__meta')).toContainText('+58 412 555 0000')
 })

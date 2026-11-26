@@ -34,5 +34,6 @@ export function mostrarTelefono(tel: string): string {
 
 /** Para editar: el número como se escribiría localmente (0412…) o con "+" si es de otro país */
 export function telefonoParaEditar(tel: string, pais: Pais): string {
+  if (!tel) return ''
   return tel.startsWith(pais.prefijo) ? pais.troncal + tel.slice(pais.prefijo.length) : '+' + tel
 }

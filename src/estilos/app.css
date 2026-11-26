@@ -95,6 +95,14 @@ svg.i--s { width: 16px; height: 16px; }
 .toldo__total { margin-top: 2px; font-family: var(--f-display); font-size: 56px; line-height: 1; letter-spacing: .01em; }
 .toldo__bs { margin-top: 8px; font-size: 19px; font-weight: 700; color: var(--mantequilla); }
 .toldo__resumen { margin-top: 12px; max-width: 46ch; font-size: 15px; opacity: .92; }
+/* Nueva venta: blanco con texto cobalto sobre el toldo, a juego con la barra */
+.toldo__venta {
+  margin-top: 18px; width: 100%; min-height: 52px; font-size: 17px; font-weight: 700;
+  background: #fff; color: var(--marca);
+}
+.toldo__venta:hover { background: var(--marca-claro); }
+.toldo__venta:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+@media (min-width: 900px) { .toldo__venta { width: auto; padding: 0 32px; } }
 .toldo__borde {
   height: calc(var(--onda) * 2 + 6px);
   background: repeating-linear-gradient(90deg, var(--marca) 0 calc(var(--onda) * 2), var(--marca-osc) calc(var(--onda) * 2) calc(var(--onda) * 4));
