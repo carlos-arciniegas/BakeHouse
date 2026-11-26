@@ -73,6 +73,7 @@ function CuentaNubeVisible() {
   const descargarCopia = useDescargarCopia()
   // Avance de la subida en %, o null si no se está subiendo
   const [avance, setAvance] = useState<number | null>(null)
+  const [trayendo, setTrayendo] = useState(false)
 
   if (!cuenta.disponible) return null
 
@@ -94,6 +95,27 @@ function CuentaNubeVisible() {
       // Desde ahora lo que se anote se guarda solo
       revisarCola()
     } else avisar(r.mensaje, { error: true })
+  }
+
+  const traer = () => {
+    const hacer = async () => {
+      if (estado.clientes.length > 0) descargarCopia()
+      setTrayendo(true)
+      const r = await cuenta.traerDeLaNube()
+      setTrayendo(false)
+      if (r.ok) {
+        avisar('Datos traídos de la nube: ' + textoResumen(r.resumen))
+        revisarCola()
+      } else avisar(r.mensaje, { error: true })
+    }
+    // Reemplazar lo que ya hay es difícil de deshacer: se confirma
+    if (estado.clientes.length === 0) void hacer()
+    else confirmar({
+      titulo: '¿Reemplazar los datos de este dispositivo?',
+      mensaje: 'Se cambian por los que hay en la nube. Antes se descarga una copia de lo que hay aquí.',
+      textoBoton: 'Traer de la nube',
+      alConfirmar: () => void hacer(),
+    })
   }
 
   const cerrarSesion = () => confirmar({
@@ -137,6 +159,24 @@ function CuentaNubeVisible() {
                 {avance !== null ? 'Subiendo… ' + avance + ' %' : 'Volver a subir todo'}
               </button>
               <p id="ayudaSubir" className="ayuda">Envía de nuevo todo lo del dispositivo, por si algo no cuadra. Antes descarga una copia y no duplica nada.</p>
+            </div>
+          </>
+        ) : cuenta.nubeConDatos === undefined ? (
+          <p>Revisando lo que hay en la nube…</p>
+        ) : cuenta.nubeConDatos ? (
+          <>
+            <p>{cuenta.conectado.nombre} ya tiene datos en la nube. Tráelos a este dispositivo para trabajar con los mismos clientes; desde ese momento todo se mantiene al día solo.</p>
+            <div>
+              <button type="button" className="boton boton--primario boton--ancho" onClick={traer} disabled={trayendo || avance !== null}>
+                {trayendo ? 'Trayendo…' : 'Traer los datos de la nube'}
+              </button>
+            </div>
+            <p>¿Este dispositivo tiene datos que la nube no? Súbelos y se juntan con los de la nube.</p>
+            <div>
+              <button type="button" className="boton boton--borde" onClick={subir} disabled={trayendo || avance !== null} aria-describedby="ayudaSubir">
+                {avance !== null ? 'Subiendo… ' + avance + ' %' : 'Subir los de este dispositivo'}
+              </button>
+              <p id="ayudaSubir" className="ayuda">Si un cliente o producto está en los dos lados, queda la versión de este dispositivo.</p>
             </div>
           </>
         ) : (

@@ -3,6 +3,7 @@ import { reductor } from '../estado/reductor'
 import type { EstadoGuardado } from './almacenamiento'
 import { CLAVE_VINCULO, type ErrorAuth } from './cuenta'
 import {
+  clavesPendientes, desdeCursor, guardarCursor, leerCursor, MARGEN_CURSOR, TAMANO_PAGINA, traerCambios, type OrigenNube,
   diferencias, encolar, enviarCola, esperaReintento, leerCola, negocioSincronizado, pendientes, quitarEnviados, textoEstadoSync,
   type DestinoSync, type EstadoSync,
 } from './sincronizacion'
@@ -194,5 +195,62 @@ describe('reintentos y textos', () => {
     expect(textoEstadoSync(e({ error: { status: 401 }, pendientes: 2 }))).toBe('Tu sesión se cerró. Quedan 2 cambios por guardar: entra de nuevo con tu correo.')
     expect(textoEstadoSync(e({ error: { status: 500 }, pendientes: 1 }))).toBe('No se pudo guardar en la nube. Queda 1 cambio por guardar; se reintentará solo.')
     expect(textoEstadoSync(e({ rechazados: 1 }))).toBe('Todo guardado en la nube. 1 cambio no se aceptó en la nube; sigue en este dispositivo.')
+  })
+})
+
+describe('traer cambios', () => {
+  /** Origen en memoria con "n" clientes; anota cada lectura */
+  function origenFalso(n: number, error?: ErrorAuth) {
+    const lecturas: { tabla: string; desde: string | null; inicio: number }[] = []
+    const clientes = Array.from({ length: n }, (_, i) => ({ id: 'cli_' + i, actualizado_en: `2026-11-20T10:${String(i % 60).padStart(2, '0')}:00.123456+00:00` }))
+    const origen: OrigenNube = {
+      leer: async (tabla, desde, inicio, limite) => {
+        lecturas.push({ tabla, desde, inicio })
+        if (error && tabla === 'movimientos') return { filas: null, error }
+        return { filas: tabla === 'clientes' ? clientes.slice(inicio, inicio + limite) : [], error: null }
+      },
+      leerNegocio: async () => ({ fila: null, error: null }),
+    }
+    return { origen, lecturas }
+  }
+
+  it('pide por páginas hasta que una viene incompleta y el cursor queda en lo más nuevo', async () => {
+    const { origen, lecturas } = origenFalso(TAMANO_PAGINA + 5)
+    const r = await traerCambios(origen, null)
+    expect(lecturas.filter((l) => l.tabla === 'clientes').map((l) => l.inicio)).toEqual([0, TAMANO_PAGINA])
+    expect(lecturas.map((l) => l.tabla)).toEqual(['clientes', 'clientes', 'movimientos', 'productos', 'metodos_pago'])
+    expect(r.ok && r.filas.clientes).toHaveLength(TAMANO_PAGINA + 5)
+    expect(r.ok && r.hasta).toBe('2026-11-20T10:59:00.123456+00:00')
+  })
+
+  it('pide desde el cursor con un margen hacia atrás', async () => {
+    const { origen, lecturas } = origenFalso(0)
+    const r = await traerCambios(origen, '2026-11-20T12:00:00.000000+00:00')
+    expect(lecturas[0].desde).toBe(new Date(Date.parse('2026-11-20T12:00:00Z') - MARGEN_CURSOR).toISOString())
+    // Sin filas nuevas el cursor no se mueve
+    expect(r.ok && r.hasta).toBe('2026-11-20T12:00:00.000000+00:00')
+  })
+
+  it('si falla una tabla no da nada por traído', async () => {
+    const { origen } = origenFalso(3, { status: 0 })
+    expect(await traerCambios(origen, null)).toEqual({ ok: false, error: { status: 0 } })
+  })
+
+  it('el cursor se guarda por negocio', () => {
+    const a = memoria()
+    expect(leerCursor(a, NEGOCIO)).toBeNull()
+    guardarCursor(a, NEGOCIO, '2026-11-20T12:00:00Z')
+    expect(leerCursor(a, NEGOCIO)).toBe('2026-11-20T12:00:00Z')
+    expect(leerCursor(a, 'otro')).toBeNull()
+    expect(desdeCursor(null)).toBeNull()
+    expect(desdeCursor('no es fecha')).toBeNull()
+  })
+
+  it('las claves pendientes incluyen el negocio si cambió', () => {
+    const a = memoria()
+    encolar(a, NEGOCIO, base, reductor(base, { tipo: 'negocio/guardar', negocio: { nombre: 'Otro', pais: 'VE' } }))
+    encolar(a, NEGOCIO, base, reductor(base, { tipo: 'cliente/eliminar', id: 'cli_2' }))
+    expect(clavesPendientes(leerCola(a))).toEqual(['clientes/cli_2', 'negocio'])
+    expect(clavesPendientes(null)).toEqual([])
   })
 })

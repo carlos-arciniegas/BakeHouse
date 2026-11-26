@@ -4,9 +4,10 @@ import { guardarVinculo, leerVinculo, mensajeDeError, type ErrorAuth } from '../
 import type { EstadoGuardado } from '../datos/almacenamiento'
 import type { FilaNegocio } from '../datos/nube'
 import type { Database } from '../datos/baseDeDatos'
-import type { DestinoSync } from '../datos/sincronizacion'
+import { guardarCursor, traerCambios, vaciarCola, type DestinoSync, type OrigenNube } from '../datos/sincronizacion'
 import { guardarSubida, leerSubida, olvidarSubida, subirDatos, type ResumenSubida } from '../datos/subida'
 import { supabase } from '../datos/supabase'
+import { useTienda } from '../estado/contextos'
 import type { Negocio } from '../logica/tipos'
 
 /** Sesión de Supabase en este dispositivo. Se mantiene sola: el token se renueva en segundo plano. */
@@ -38,6 +39,31 @@ export function crearDestino(nube: SupabaseClient<Database>, negocioId: string):
   }
 }
 
+/** Lee de las tablas de un negocio de Supabase (lo que cambió en otros dispositivos) */
+export function crearOrigen(nube: SupabaseClient<Database>, negocioId: string): OrigenNube {
+  return {
+    leer: async (tabla, desde, inicio, limite) => {
+      let consulta = nube.from(tabla as 'clientes').select('*').eq('negocio_id', negocioId)
+      if (desde) consulta = consulta.gte('actualizado_en', desde)
+      const { data, error, status } = await consulta.order('actualizado_en').order('id').range(inicio, inicio + limite - 1)
+      return { filas: data, error: error ? { status, code: error.code } : null }
+    },
+    leerNegocio: async () => {
+      const { data, error, status } = await nube.from('negocios').select('*').eq('id', negocioId).limit(1)
+      return { fila: data?.[0] ?? null, error: error ? { status, code: error.code } : null }
+    },
+  }
+}
+
+/** ¿El negocio ya tiene clientes o productos en la nube? (entonces este es un dispositivo más) */
+async function tieneDatos(nube: SupabaseClient<Database>, negocioId: string): Promise<boolean | null> {
+  const contar = (tabla: 'clientes' | 'productos') =>
+    nube.from(tabla).select('id', { count: 'exact', head: true }).eq('negocio_id', negocioId).is('borrado_en', null)
+  const [c, p] = await Promise.all([contar('clientes'), contar('productos')])
+  if (c.error || p.error) return null
+  return (c.count ?? 0) + (p.count ?? 0) > 0
+}
+
 const fallo = (error: ErrorAuth): ResultadoNube => ({ ok: false, mensaje: mensajeDeError(error) })
 
 /**
@@ -51,6 +77,9 @@ export function useCuentaNube() {
   const [vinculo, setVinculo] = useState(() => leerVinculo(localStorage))
   const [error, setError] = useState<string | null>(null)
   const [subida, setSubida] = useState(() => leerSubida(localStorage))
+  const { despachar } = useTienda()
+  // Si el negocio conectado ya tiene datos en la nube (por negocio, para no mezclar respuestas viejas)
+  const [conDatos, setConDatos] = useState<{ negocioId: string; valor: boolean | null } | null>(null)
 
   // Al cambiar de cuenta (o cerrar sesión) se olvida la lista anterior
   const [usuarioAntes, setUsuarioAntes] = useState(usuarioId)
@@ -80,6 +109,17 @@ export function useCuentaNube() {
     })
     return () => { vigente = false }
   }, [usuarioId, conectar])
+
+  const subidaVigente = subida !== null && subida.negocioId === vinculo
+  const necesitaSaber = supabase !== null && usuarioId !== null && vinculo !== null && !subidaVigente
+  useEffect(() => {
+    if (!supabase || !necesitaSaber || !vinculo) return
+    let vigente = true
+    void tieneDatos(supabase, vinculo).then((valor) => {
+      if (vigente) setConDatos({ negocioId: vinculo, valor })
+    })
+    return () => { vigente = false }
+  }, [necesitaSaber, vinculo])
 
   const enviarEnlace = async (correo: string): Promise<ResultadoNube> => {
     if (!supabase) return { ok: false, mensaje: 'La nube no está configurada.' }
@@ -119,6 +159,22 @@ export function useCuentaNube() {
     return r
   }
 
+  /** Dispositivo nuevo: reemplaza lo local por lo que hay en la nube y desde ahí sincroniza */
+  const traerDeLaNube = async (): Promise<{ ok: true; resumen: ResumenSubida } | { ok: false; mensaje: string }> => {
+    if (!supabase || !vinculo) return { ok: false, mensaje: 'Primero conecta este dispositivo a un negocio.' }
+    const r = await traerCambios(crearOrigen(supabase, vinculo), null)
+    if (!r.ok) return { ok: false, mensaje: mensajeDeError(r.error) }
+    // Lo pendiente de antes ya no aplica: lo local se reemplaza
+    vaciarCola(localStorage)
+    despachar({ tipo: 'nube/aplicar', cambios: { filas: r.filas, negocio: r.negocio, pendientes: [], reemplazar: true } })
+    if (r.hasta) guardarCursor(localStorage, vinculo, r.hasta)
+    const vivas = <T extends { borrado_en: string | null }>(l: T[]) => l.filter((f) => f.borrado_en === null).length
+    const resumen = { negocioId: vinculo, fecha: new Date().toISOString(), clientes: vivas(r.filas.clientes), movimientos: vivas(r.filas.movimientos) }
+    guardarSubida(localStorage, resumen)
+    setSubida(resumen)
+    return { ok: true, resumen }
+  }
+
   const cerrarSesion = async () => {
     // Lo que se anote sin sesión no entra en la cola: al volver habrá que subir todo de nuevo
     olvidarSubida(localStorage)
@@ -136,11 +192,14 @@ export function useCuentaNube() {
     negocios: negocios ?? [],
     conectado,
     // Solo la del negocio conectado
-    ultimaSubida: subida && subida.negocioId === vinculo ? subida : null,
+    ultimaSubida: subidaVigente ? subida : null,
+    /** undefined mientras se averigua; null si no se pudo saber (se ofrece subir) */
+    nubeConDatos: conDatos?.negocioId === vinculo ? conDatos.valor : undefined,
     error,
     enviarEnlace,
     crearEnNube,
     subirMisDatos,
+    traerDeLaNube,
     conectar,
     cerrarSesion,
   }

@@ -2,7 +2,7 @@ import { fechaHoy } from '../logica/fechas'
 import type { Cliente } from '../logica/tipos'
 import type { Almacen, EstadoGuardado } from './almacenamiento'
 import { leerVinculo, type ErrorAuth } from './cuenta'
-import { dividirEnLotes, filaCliente, filaMetodo, filaMovimiento, filaProducto, negocioAFila } from './nube'
+import { dividirEnLotes, filaCliente, filaMetodo, filaMovimiento, filaProducto, negocioAFila, type FilaNegocio, type FilasRecibidas } from './nube'
 import { leerSubida, TAMANO_LOTE, type Destino, type TablaDeDatos } from './subida'
 
 // Sincronización, parte 1: cada cambio local queda en una cola que se envía a la nube cuando hay red.
@@ -125,6 +125,15 @@ function guardarCola(a: Almacen, cola: Cola) {
   }
 }
 
+/** Al traer todo de la nube, lo pendiente de antes ya no aplica */
+export function vaciarCola(a: Pick<Storage, 'removeItem'>): void {
+  try {
+    a.removeItem(CLAVE_COLA)
+  } catch {
+    // sin almacenamiento
+  }
+}
+
 export function pendientes(cola: Cola | null): number {
   return cola ? Object.keys(cola.cambios).length + (cola.negocio ? 1 : 0) : 0
 }
@@ -216,6 +225,78 @@ export function quitarEnviados(a: Almacen, negocioId: string, r: ResultadoEnvio)
 /** Espera antes de reintentar tras un error: 5 s, 10 s, 20 s… hasta 5 minutos */
 export function esperaReintento(intentos: number): number {
   return Math.min(5000 * 2 ** Math.max(intentos - 1, 0), 5 * 60 * 1000)
+}
+
+// ---------- Traer lo que cambió en otros dispositivos ----------
+
+/** Hasta dónde se trajo (hora del servidor), por negocio */
+export const CLAVE_CURSOR = 'pachons_nube_cursor_v1'
+
+/** Margen hacia atrás al pedir cambios: una transacción que empezó antes puede guardarse después */
+export const MARGEN_CURSOR = 2 * 60 * 1000
+export const TAMANO_PAGINA = 1000
+
+export interface OrigenNube {
+  /** Filas de una tabla con actualizado_en >= desde (todas si desde es null), ordenadas, por páginas */
+  leer(tabla: TablaDeDatos, desde: string | null, inicio: number, limite: number): Promise<{ filas: object[] | null; error: ErrorAuth | null }>
+  leerNegocio(): Promise<{ fila: FilaNegocio | null; error: ErrorAuth | null }>
+}
+
+export function leerCursor(a: Almacen, negocioId: string): string | null {
+  try {
+    const c = JSON.parse(a.getItem(CLAVE_CURSOR) ?? 'null') as { negocioId: string; hasta: string } | null
+    return c?.negocioId === negocioId && typeof c.hasta === 'string' ? c.hasta : null
+  } catch {
+    return null
+  }
+}
+
+export function guardarCursor(a: Almacen, negocioId: string, hasta: string): void {
+  try {
+    a.setItem(CLAVE_CURSOR, JSON.stringify({ negocioId, hasta }))
+  } catch {
+    // sin almacenamiento: la próxima vez se trae todo (aplicar es idempotente)
+  }
+}
+
+/** Desde cuándo pedir, con el margen; null = todo */
+export function desdeCursor(hasta: string | null): string | null {
+  const t = hasta ? Date.parse(hasta) : NaN
+  return Number.isNaN(t) ? null : new Date(t - MARGEN_CURSOR).toISOString()
+}
+
+const CAMPO: Record<TablaDeDatos, keyof FilasRecibidas> = {
+  clientes: 'clientes', movimientos: 'movimientos', productos: 'productos', metodos_pago: 'metodos',
+}
+
+export type ResultadoTraer =
+  | { ok: true; filas: FilasRecibidas; negocio: FilaNegocio | null; hasta: string | null }
+  | { ok: false; error: ErrorAuth }
+
+/** Trae todo lo que cambió desde "hasta" (o todo, si es null) y calcula el nuevo cursor */
+export async function traerCambios(origen: OrigenNube, hasta: string | null): Promise<ResultadoTraer> {
+  const filas: FilasRecibidas = { clientes: [], movimientos: [], productos: [], metodos: [] }
+  const desde = desdeCursor(hasta)
+  let nuevo = hasta
+
+  for (const tabla of ORDEN) {
+    for (let inicio = 0; ; inicio += TAMANO_PAGINA) {
+      const r = await origen.leer(tabla, desde, inicio, TAMANO_PAGINA)
+      if (r.error || !r.filas) return { ok: false, error: r.error ?? { status: 500 } }
+      ;(filas[CAMPO[tabla]] as object[]).push(...r.filas)
+      for (const f of r.filas as { actualizado_en: string }[]) if (!nuevo || f.actualizado_en > nuevo) nuevo = f.actualizado_en
+      if (r.filas.length < TAMANO_PAGINA) break
+    }
+  }
+
+  const n = await origen.leerNegocio()
+  if (n.error) return { ok: false, error: n.error }
+  return { ok: true, filas, negocio: n.fila, hasta: nuevo }
+}
+
+/** Claves con cambios locales sin enviar (esas filas no se pisan con lo que llega) */
+export function clavesPendientes(cola: Cola | null): string[] {
+  return cola ? [...Object.keys(cola.cambios), ...(cola.negocio ? ['negocio'] : [])] : []
 }
 
 // ---------- Lo que ve la persona ----------

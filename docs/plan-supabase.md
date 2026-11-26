@@ -69,12 +69,16 @@ Proyecto `kvvzdbycnabpkkszcpge`, región **eu-west-1 (Irlanda)**. Desde Venezuel
 - Lo borrado se marca con `borrado_en` en lugar de borrarse, para que los otros dispositivos también lo quiten (5b).
 - Una fila que la nube rechaza por sus datos se descarta de la cola (sigue en el dispositivo) y se avisa, para que no bloquee lo demás.
 - Indicador en Ajustes: "Todo guardado en la nube", "Sin conexión: 1 cambio se guardará al volver la red", "Tu sesión se cerró…".
-- Pendiente conocido: lo que se borre sin sesión no llega a la nube (volver a subir todo no envía borrados). Se resuelve con 5b.
+- Pendiente conocido: lo que se borre sin sesión no llega a la nube (volver a subir todo no envía borrados).
 
-#### 5b: traer los cambios de otros dispositivos
-- "Dame lo que cambió desde la última sincronización", con un margen de solapamiento para no perder cambios de transacciones simultáneas; aplicar es idempotente.
-- Se trae al abrir la app, al volver la conexión y cada cierto tiempo con la app abierta.
-- Pruebas: la lógica de mezcla con Vitest; los flujos (dos dispositivos) con Playwright.
+#### 5b: traer los cambios de otros dispositivos (hecho, oculto en producción)
+- `traerCambios` pide a cada tabla las filas con `actualizado_en` (hora del servidor) desde el último cursor menos 2 minutos de margen, por páginas de 1000. El cursor (`pachons_nube_cursor_v1`) es lo más nuevo que se recibió.
+- `aplicarDesdeNube` (`src/datos/mezcla.ts`, la usa el reductor con la acción `nube/aplicar`) agrega, actualiza o quita. Lo que tiene cambios locales sin enviar no se toca: gana lo local, que se envía después. Si nada cambió devuelve el mismo estado.
+- Lo que llega de la nube no vuelve a la cola: la tienda marca el origen de la acción.
+- Se trae al abrir la app, al volver la red, al volver a la app y cada minuto con la app a la vista; tras un cambio local solo se envía. Siempre se envía antes de traer.
+- La tasa BCV la consulta cada dispositivo: de la nube solo se toma si aquí no hay.
+- **Dispositivo nuevo:** si el negocio ya tiene datos en la nube, el botón principal es "Traer los datos de la nube" (reemplaza lo local; si hay clientes, confirma y descarga una copia antes). "Subir los de este dispositivo" queda como opción para juntar ambos.
+- Pruebas: la mezcla y la descarga con Vitest; dos dispositivos contra un Supabase falso en memoria con Playwright.
 
 ### Fase 6: pasar a Pachon's
 0. **Requisito:** configurar un SMTP propio (por ejemplo Resend) en *Authentication → SMTP*. El correo que trae Supabase es de prueba: 2 correos por hora para todo el proyecto, y el inicio de sesión por enlace mágico depende de esos correos.

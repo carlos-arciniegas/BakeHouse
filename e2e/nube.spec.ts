@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test, type Browser, type Page } from '@playwright/test'
 import { abrirConDatos, DATOS_VENEZUELA, fila, guardado } from './ayudantes.ts'
 
 // Supabase se simula por completo: no se envían correos ni se toca el proyecto real.
@@ -8,25 +8,57 @@ const NEGOCIO_NUBE = { id: '11111111-1111-1111-1111-111111111111', nombre: "Pach
 // supabase-js guarda la sesión en "sb-<ref del proyecto>-auth-token"
 const CLAVE_SESION = 'sb-kvvzdbycnabpkkszcpge-auth-token'
 
+type Fila = Record<string, unknown> & { id: string; actualizado_en: string }
+
+/** Las tablas en memoria de un Supabase falso; dos páginas pueden compartirlo (dos dispositivos) */
+interface Servidor {
+  negocios: Fila[]
+  tablas: Record<string, Fila[]>
+}
+
+const TABLAS_DE_DATOS = ['clientes', 'movimientos', 'productos', 'metodos_pago']
+
+function nuevoServidor(negocios: typeof NEGOCIO_NUBE[] = []): Servidor {
+  return { negocios: negocios.map((n) => ({ ...n })), tablas: Object.fromEntries(TABLAS_DE_DATOS.map((t) => [t, []])) }
+}
+
+// Hora del servidor: siempre creciente, como actualizado_en en la base
+let reloj = Date.parse('2026-11-20T12:00:00Z')
+const ahora = () => new Date(reloj += 1000).toISOString()
+
+/** Filtros de PostgREST que usa la app: eq, gte, in, is.null */
+function cumple(fila: Fila, url: URL): boolean {
+  for (const [campo, valor] of url.searchParams) {
+    if (['select', 'order', 'offset', 'limit', 'on_conflict', 'columns'].includes(campo)) continue
+    const v = fila[campo]
+    if (valor.startsWith('eq.') && String(v) !== valor.slice(3)) return false
+    if (valor.startsWith('gte.') && !(String(v) >= valor.slice(4))) return false
+    if (valor.startsWith('in.(') && !valor.slice(4, -1).split(',').includes(String(v))) return false
+    if (valor === 'is.null' && v !== null && v !== undefined) return false
+  }
+  return true
+}
+
 interface Simulacion {
   negocios?: typeof NEGOCIO_NUBE[]
+  servidor?: Servidor
   limiteDeCorreos?: boolean
   /** Corta la red al subir a esta tabla (mientras sea true) */
   sinRedEn?: { tabla: string; activo: boolean }
 }
 
-const TABLAS_DE_DATOS = ['clientes', 'movimientos', 'productos', 'metodos_pago']
-
-/** Responde como Supabase y anota cada llamada; una llamada no prevista hace fallar la prueba */
+/** Responde como Supabase (con datos en memoria) y anota cada llamada; una llamada no prevista hace fallar la prueba */
 async function simularSupabase(page: Page, opciones: Simulacion = {}) {
+  const servidor = opciones.servidor ?? nuevoServidor(opciones.negocios)
   const llamadas: { metodo: string; ruta: string; cuerpo: unknown; url: string; cabeceras: Record<string, string> }[] = []
   await page.route(/\.supabase\.co\//, async (ruta) => {
     const peticion = ruta.request()
+    const metodo = peticion.method()
     const url = new URL(peticion.url())
     const cuerpo = peticion.postData() ? JSON.parse(peticion.postData()!) : null
     const tabla = url.pathname.replace('/rest/v1/', '')
-    if (opciones.sinRedEn?.activo && opciones.sinRedEn.tabla === tabla) return ruta.abort('internetdisconnected')
-    llamadas.push({ metodo: peticion.method(), ruta: url.pathname, cuerpo, url: peticion.url(), cabeceras: peticion.headers() })
+    if (opciones.sinRedEn?.activo && opciones.sinRedEn.tabla === tabla && metodo === 'POST') return ruta.abort('internetdisconnected')
+    llamadas.push({ metodo, ruta: url.pathname, cuerpo, url: peticion.url(), cabeceras: peticion.headers() })
 
     if (url.pathname === '/auth/v1/otp') {
       return opciones.limiteDeCorreos
@@ -35,13 +67,39 @@ async function simularSupabase(page: Page, opciones: Simulacion = {}) {
     }
     if (url.pathname === '/auth/v1/logout') return ruta.fulfill({ status: 204 })
     if (url.pathname === '/auth/v1/user') return ruta.fulfill({ json: { ...USUARIO, aud: 'authenticated', role: 'authenticated' } })
-    if (url.pathname === '/rest/v1/negocios') {
-      return peticion.method() === 'PATCH' ? ruta.fulfill({ status: 204 }) : ruta.fulfill({ json: opciones.negocios ?? [] })
+    if (url.pathname === '/rest/v1/rpc/crear_negocio') {
+      servidor.negocios.push({ ...NEGOCIO_NUBE, nombre: cuerpo.nombre, pais: cuerpo.pais, actualizado_en: ahora() })
+      return ruta.fulfill({ json: NEGOCIO_NUBE.id })
     }
-    if (peticion.method() === 'POST' && TABLAS_DE_DATOS.includes(tabla)) return ruta.fulfill({ status: 201 })
-    if (peticion.method() === 'PATCH' && TABLAS_DE_DATOS.includes(tabla)) return ruta.fulfill({ status: 204 })
-    if (url.pathname === '/rest/v1/rpc/crear_negocio') return ruta.fulfill({ json: NEGOCIO_NUBE.id })
-    return ruta.fulfill({ status: 500, json: { message: 'Llamada no prevista en la prueba: ' + url.pathname } })
+
+    const filas = tabla === 'negocios' ? servidor.negocios : servidor.tablas[tabla]
+    if (!filas) return ruta.fulfill({ status: 500, json: { message: 'Llamada no prevista en la prueba: ' + url.pathname } })
+
+    if (metodo === 'GET' || metodo === 'HEAD') {
+      const elegidas = filas.filter((f) => cumple(f, url))
+        .sort((a, b) => a.actualizado_en.localeCompare(b.actualizado_en) || a.id.localeCompare(b.id))
+      const desde = Number(url.searchParams.get('offset') ?? 0)
+      const limite = Number(url.searchParams.get('limit') ?? 10000)
+      const pagina = elegidas.slice(desde, desde + limite)
+      return metodo === 'HEAD'
+        // Como Supabase: el total va en Content-Range, expuesto por CORS
+        ? ruta.fulfill({ status: 200, headers: { 'content-range': '*/' + elegidas.length, 'access-control-allow-origin': '*', 'access-control-expose-headers': 'Content-Range' } })
+        : ruta.fulfill({ json: pagina })
+    }
+    if (metodo === 'POST') {
+      for (const nueva of cuerpo as Fila[]) {
+        const i = filas.findIndex((f) => f.id === nueva.id)
+        const fila = { creado_en: ahora(), borrado_en: null, ...(i >= 0 ? filas[i] : {}), ...nueva, actualizado_en: ahora() }
+        if (i >= 0) filas[i] = fila
+        else filas.push(fila)
+      }
+      return ruta.fulfill({ status: 201 })
+    }
+    if (metodo === 'PATCH') {
+      for (const [i, f] of filas.entries()) if (cumple(f, url)) filas[i] = { ...f, ...cuerpo, actualizado_en: ahora() }
+      return ruta.fulfill({ status: 204 })
+    }
+    return ruta.fulfill({ status: 500, json: { message: 'Llamada no prevista en la prueba: ' + metodo + ' ' + url.pathname } })
   })
   return llamadas
 }
@@ -53,8 +111,8 @@ function tokenFalso() {
   return `${b64({ alg: 'HS256', typ: 'JWT' })}.${b64({ sub: USUARIO.id, email: USUARIO.email, role: 'authenticated', aud: 'authenticated', exp })}.firma`
 }
 
-async function abrirAjustes(page: Page, { conSesion = false, nubeVisible = true, yaSubido = false } = {}) {
-  await abrirConDatos(page, DATOS_VENEZUELA)
+async function abrirAjustes(page: Page, { conSesion = false, nubeVisible = true, yaSubido = false, datos = DATOS_VENEZUELA as Record<string, unknown> } = {}) {
+  await abrirConDatos(page, datos)
   await page.evaluate(({ clave, sesion, nubeVisible, subida }) => {
     if (nubeVisible) localStorage.setItem('pachons_probar_nube_v1', '1')
     if (sesion) localStorage.setItem(clave, JSON.stringify(sesion))
@@ -252,6 +310,90 @@ test('sin haber subido los datos no se envía nada', async ({ page }) => {
   await abrirAjustes(page, { conSesion: true })
   await anotarPago(page)
   await page.waitForTimeout(2500)
-  expect(llamadas.filter((l) => TABLAS_DE_DATOS.some((t) => l.ruta === '/rest/v1/' + t))).toHaveLength(0)
+  expect(llamadas.filter((l) => ['POST', 'PATCH'].includes(l.metodo) && TABLAS_DE_DATOS.some((t) => l.ruta === '/rest/v1/' + t))).toHaveLength(0)
   expect(await page.evaluate(() => localStorage.getItem('pachons_nube_cola_v1'))).toBeNull()
+})
+
+// ---------- Dos dispositivos con el mismo negocio ----------
+
+/** Otro dispositivo: un contexto aparte (con su propio localStorage) contra el mismo servidor */
+async function otroDispositivo(browser: Browser, baseURL: string | undefined) {
+  const contexto = await browser.newContext({ baseURL })
+  return contexto.newPage()
+}
+
+/** Pide sincronizar ya (lo mismo que pasa al volver la red o al volver a la app) */
+const sincronizarAhora = (page: Page) => page.evaluate(() => window.dispatchEvent(new Event('online')))
+
+const irA = (page: Page, vista: string) => page.getByRole('navigation', { name: 'Secciones' }).getByRole('button', { name: vista }).click()
+
+const escrituras = (llamadas: Awaited<ReturnType<typeof simularSupabase>>) =>
+  llamadas.filter((l) => ['POST', 'PATCH'].includes(l.metodo) && TABLAS_DE_DATOS.some((t) => l.ruta === '/rest/v1/' + t))
+
+/** El dispositivo A sube sus datos y el B (un teléfono nuevo, sin clientes) los trae */
+async function dosDispositivos(page: Page, browser: Browser, baseURL: string | undefined) {
+  const servidor = nuevoServidor([NEGOCIO_NUBE])
+  const llamadasA = await simularSupabase(page, { servidor })
+  await abrirAjustes(page, { conSesion: true })
+  await seccion(page).getByRole('button', { name: 'Subir mis datos' }).click()
+  await expect(page.locator('.toast').last()).toHaveText('Datos subidos: 3 clientes y 7 movimientos')
+
+  const b = await otroDispositivo(browser, baseURL)
+  const llamadasB = await simularSupabase(b, { servidor })
+  await abrirAjustes(b, { conSesion: true, datos: {} })
+  return { servidor, llamadasA, b, llamadasB }
+}
+
+test('un dispositivo nuevo trae los datos de la nube en lugar de pisarlos', async ({ page, browser, baseURL }) => {
+  const { b, llamadasB } = await dosDispositivos(page, browser, baseURL)
+
+  await expect(seccion(b)).toContainText("Pachon's Bakehouse ya tiene datos en la nube")
+  await seccion(b).getByRole('button', { name: 'Traer los datos de la nube' }).click()
+  await expect(b.locator('.toast').last()).toHaveText('Datos traídos de la nube: 3 clientes y 7 movimientos')
+  await expect(seccion(b).getByRole('status')).toHaveText('Todo guardado en la nube.')
+
+  await irA(b, 'Cuentas')
+  await expect(fila(b, 'María Fernanda Pérez').locator('.fila__monto')).toHaveText('$6,50')
+  // Lo traído no se reenvía a la nube
+  await b.waitForTimeout(2000)
+  expect(escrituras(llamadasB)).toHaveLength(0)
+})
+
+test('si el dispositivo ya tiene clientes, pide confirmar antes de reemplazarlos', async ({ page }) => {
+  const servidor = nuevoServidor([NEGOCIO_NUBE])
+  servidor.tablas.clientes.push({ id: 'c9', nombre: 'Marta', telefono: '', nota: '', negocio_id: NEGOCIO_NUBE.id, creado_en: ahora(), actualizado_en: ahora(), borrado_en: null })
+  await simularSupabase(page, { servidor })
+  await abrirAjustes(page, { conSesion: true })
+
+  await seccion(page).getByRole('button', { name: 'Traer los datos de la nube' }).click()
+  const dialogo = page.getByRole('alertdialog', { name: '¿Reemplazar los datos de este dispositivo?' })
+  const copia = page.waitForEvent('download')
+  await dialogo.getByRole('button', { name: 'Traer de la nube' }).click()
+  await copia
+  await expect(page.locator('.toast').last()).toHaveText('Datos traídos de la nube: 1 cliente y 0 movimientos')
+  await irA(page, 'Cuentas')
+  await expect(fila(page, 'Marta')).toBeVisible()
+  await expect(fila(page, 'José Rodríguez')).toHaveCount(0)
+})
+
+test('lo anotado o borrado en un dispositivo aparece en el otro', async ({ page, browser, baseURL }) => {
+  const { servidor, b } = await dosDispositivos(page, browser, baseURL)
+  await seccion(b).getByRole('button', { name: 'Traer los datos de la nube' }).click()
+  await expect(b.locator('.toast').last()).toHaveText('Datos traídos de la nube: 3 clientes y 7 movimientos')
+
+  // A anota un pago de María; B lo ve al sincronizar
+  await anotarPago(page)
+  await expect.poll(() => servidor.tablas.movimientos.length).toBe(8)
+  await irA(b, 'Cuentas')
+  await sincronizarAhora(b)
+  await expect(fila(b, 'María Fernanda Pérez').locator('.fila__aldia')).toHaveText('Al día')
+
+  // B borra la última venta de José; A deja de verla
+  const jose = fila(b, 'José Rodríguez')
+  await jose.getByRole('button', { name: /Historial/ }).click()
+  await jose.getByRole('button', { name: 'Eliminar movimiento' }).first().click()
+  await expect.poll(() => servidor.tablas.movimientos.find((m) => m.id === 'm5')?.borrado_en).not.toBeNull()
+  await irA(page, 'Cuentas')
+  await sincronizarAhora(page)
+  await expect(fila(page, 'José Rodríguez').getByRole('button', { name: /Historial/ })).toHaveText(/Historial \(1\)/)
 })

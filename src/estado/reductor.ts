@@ -1,4 +1,5 @@
 import type { EstadoGuardado } from '../datos/almacenamiento'
+import { aplicarDesdeNube, type CambiosDeLaNube } from '../datos/mezcla'
 import type { Cliente, ConfigBCV, MetodoPago, Movimiento, Negocio, Producto } from '../logica/tipos'
 
 /**
@@ -25,6 +26,8 @@ export type Accion =
   | { tipo: 'negocio/guardar'; negocio: Negocio }
   | { tipo: 'bcv/guardar'; bcv: ConfigBCV }
   | { tipo: 'estado/reemplazar'; estado: EstadoGuardado }
+  /** Cambios hechos en otro dispositivo; la tienda no los vuelve a enviar a la nube */
+  | { tipo: 'nube/aplicar'; cambios: CambiosDeLaNube }
 
 function conCliente(estado: EstadoGuardado, id: string, cambio: (c: Cliente) => Cliente): EstadoGuardado {
   return { ...estado, clientes: estado.clientes.map((c) => (c.id === id ? cambio(c) : c)) }
@@ -92,5 +95,7 @@ export function reductor(estado: EstadoGuardado, accion: Accion): EstadoGuardado
       return { ...estado, bcv: accion.bcv }
     case 'estado/reemplazar':
       return accion.estado
+    case 'nube/aplicar':
+      return aplicarDesdeNube(estado, accion.cambios)
   }
 }
